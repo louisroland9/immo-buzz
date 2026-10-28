@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Base de données SQLite
+data/*.db
+data/*.db-journal
+data/*.db-wal
+
+# Environnement et Secrets
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/

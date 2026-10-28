@@ -1,0 +1,62 @@
+{
+  "total": 3,
+  "realEstateAds": [
+    {
+      "id": "era-1565943",
+      "title": "",
+      "propertyType": "flat",
+      "adType": "buy",
+      "price": 159430,
+      "surfaceArea": 47.26,
+      "city": "Lille",
+      "postalCode": "59000",
+      "roomsQuantity": 2,
+      "description": "Bel appartement 2 pieces de 47 m2 dans une residence recente.",
+      "publicationDate": "2026-10-12T14:05:08.673Z",
+      "energyClassification": "C",
+      "displayDistrictName": "Lille - Fives",
+      "district": {
+        "id": 103050,
+        "name": "Lille - Fives",
+        "libelle": "Fives",
+        "postal_code": "59800"
+      }
+    },
+    {
+      "id": "abc-9001",
+      "title": "Maison a renover 5 pieces",
+      "propertyType": "house",
+      "adType": "buy",
+      "price": 210000,
+      "surfaceArea": 95.0,
+      "city": "Roubaix",
+      "postalCode": "59100",
+      "roomsQuantity": 5,
+      "description": "Maison ancienne, travaux importants a prevoir : toiture a refaire.",
+      "publicationDate": "2026-10-10T08:00:00.000Z",
+      "energyClassification": "F",
+      "district": null
+    },
+    {
+      "id": "xyz-42",
+      "title": "Place de parking en sous-sol",
+      "propertyType": "parking",
+      "adType": "buy",
+      "price": 9000,
+      "surfaceArea": null,
+      "city": "Lille",
+      "postalCode": "59800",
+      "roomsQuantity": null,
+      "description": "Place de parking securisee.",
+      "publicationDate": "2026-10-11T09:30:00.000Z",
+      "energyClassification": null,
+      "district": null
+    },
+    {
+      "id": "skip-1",
+      "propertyType": "loft",
+      "price": null,
+      "city": "Lille"
+    }
+  ]
+}

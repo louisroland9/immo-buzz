@@ -1,0 +1,96 @@
+# 🛑 Style de Communication et Économie de Tokens (Strict)
+* **Pas de blabla :** Supprime toutes les formules de politesse, phrases d'introduction ("Certainement !", "Voici le code...") ou de conclusion. Va directement au fait.
+* **Pas de narration :** Ne décris pas tes actions étape par étape dans le chat pendant que tu modifies un fichier. Le code parle d'lui-même.
+* **Modifications minimales :** Lorsque tu modifies un fichier existant, n'affiche pas ou ne réécris pas les blocs de code inchangés si tu peux l'éviter. Concentre-toi uniquement sur la zone d'impact.
+* **Synthèse :** Si une explication est nécessaire, limite-toi à un résumé d'une phrase ou à un maximum de 3 puces courtes.
+# Règles de gestion Git obligatoires
+
+Tu dois STRICTEMENT respecter les règles Git suivantes lors de tes interventions :
+
+## 1. Commits et Messages
+* **Format des messages :** Utilise rigoureusement la convention Conventional Commits (ex: `feat(auth): add login validation`, `fix(api): resolve memory leak`).
+* **Fréquence :** Ne fais jamais de gros commits regroupant plusieurs fonctionnalités. Crée un commit par unité logique de travail terminée.
+* **Langue :** Rédige tous les messages de commit en Anglais
+
+## 2. Gestion des Branches
+* **Interdiction de pousser sur main :** Tu n'es jamais autorisé à commit ou push directement sur les branches `main` ou `master`.
+* **Création de branche :** Pour chaque nouvelle tâche, crée une branche dédiée en respectant le format : `feature/nom-de-la-tache` ou `fix/nom-du-bug`.
+
+## 3. Workflow de validation
+* **Vérification du code :** Avant de commit, assure-toi que le code compile et que les tests existants passent (exécute `npm test` ou la commande appropriée du projet).
+* **Git Status :** Avant chaque commit, utilise `git status` et `git diff` pour vérifier exactement ce que tu t'apprêtes à enregistrer. Ne fais jamais de `git add .` aveugle.
+* **Fichiers ignorés :** Ne force jamais l'ajout de fichiers présents dans le `.gitignore`.
+
+## 4. Conflits et Push
+* **Synchronisation :** Fais toujours un `git pull --rebase` avant de pousser ton travail pour éviter les conflits inutiles.
+* **En cas de conflit :** Si un conflit de fusion apparaît, arrête-toi immédiatement et demande l'aide de l'utilisateur. Ne tente pas de le résoudre seul si tu n'es pas sûr à 100%.
+# Règles de développement Python (FastAPI / Streamlit / uv)
+
+Tu dois STRICTEMENT respecter l'architecture du projet, les outils modernes de l'écosystème Python et les spécificités de chaque framework.
+
+## 1. Gestion du Projet et Dépendances (uv)
+* **Commandes interdites :** Ne jamais utiliser `pip`, `poetry` ou `pipenv`.
+* **Installation :** Pour ajouter un paquet, utilise exclusivement `uv add <package>`. Pour l'environnement de développement, utilise `uv add --dev <package>`.
+* **Exécution :** Exécute toujours les scripts et outils (pytest, ruff, streamlit) via `uv run <commande>` (ex: `uv run streamlit run app.py`, `uv run pytest`).
+
+## 2. Style, Typage et Standards Python 3
+* **Python Moderne :** Utilise les fonctionnalités récentes de Python 3.10+ (syntaxe de typage native `dict[str, int] | None`, `match/case` si pertinent).
+* **Type Hinting :** Le typage statique est **obligatoire** sur toutes les fonctions (arguments et retours).
+* **Qualité de code :** Si `ruff` est disponible, exécute `uv run ruff check --fix` et `uv run ruff format` après chaque modification de fichier.
+
+## 3. Architecture et Backend (FastAPI)
+* **Déclarations :** Utilise `Annotated` pour l'injection de dépendances (ex: `db: Annotated[Session, Depends(get_db)]`).
+* **Modèles de données :** Sépare strictement les modèles de base de données (SQLAlchemy/SQLModel) des schémas d'API (Pydantic v2).
+* **Asynchronisme :** Utilise `async def` uniquement pour les endpoints qui effectuent des opérations d'I/O asynchrones. Pour les opérations synchrones (comme SQLAlchemy classique sans pilote async), utilise `def` standard pour ne pas bloquer la boucle d'événements.
+
+## 4. Base de données (SQLite)
+* **Gestion des connexions :** Utilise un gestionnaire de contexte (`with`) ou le pattern de session FastAPI (`yield` dans la dépendance de base de données) pour garantir la fermeture des connexions.
+* **Configuration :** Active explicitement les clés étrangères sur SQLite à chaque ouverture de connexion : `PRAGMA foreign_keys = ON;`.
+* **Migrations :** N'altère jamais les tables manuellement en production. Utilise `alembic` si disponible pour toute modification de schéma.
+
+## 5. Interface Utilisateur (Streamlit)
+* **Performance et Caching :** Utilise les décorateurs `@st.cache_data` (pour les requêtes SQL, API, lectures de fichiers) et `@st.cache_resource` (pour les connexions DB, clients API) pour éviter de recharger les ressources à chaque interaction.
+* **Gestion de l'État :** Utilise `st.session_state` de manière centralisée pour maintenir l'état de l'application entre les re-runs. Initialise toujours les clés requises au démarrage de la page.
+* **Séparation des concepts :** Ne mets jamais de logique métier (requêtes SQL directes, appels d'API complexes) directement dans les fichiers de vue Streamlit. Appelle les services ou l'API FastAPI dédiés.
+# Règles d'implémentation SQLModel (avec SQLite & FastAPI)
+
+Tu dois STRICTEMENT respecter les patterns d'utilisation de SQLModel suivants pour garantir la propreté du code et la compatibilité avec FastAPI / Pydantic v2 :
+
+## 1. Définition des Modèles (Séparation des concepts)
+* **Modèle de Table (`table=True`) :** Utilise `table=True` uniquement pour la classe représentant la table physique en base de données. Nomme ces classes de manière simple et singulière (ex: `User`, `Item`).
+* **Héritage pour les Schémas d'API :** Pour éviter la duplication de code, utilise le pattern d'héritage de SQLModel pour générer les schémas d'API (Pydantic) :
+  * `UserBase(SQLModel)` : Contient les champs communs partagés.
+  * `UserCreate(UserBase)` : Contient les champs requis à la création (avec mot de passe en clair par exemple).
+  * `UserRead(UserBase)` : Contient les champs retournés par l'API (avec `id: int`).
+  * `User(UserBase, table=True)` : Le modèle de base de données final avec `id: int | None = Field(default=None, primary_key=True)`.
+
+## 2. Configuration du Moteur SQLite (Engine)
+* **Création de l'Engine :** Configure l'engine avec les paramètres spécifiques pour SQLite afin de gérer la concurrence et le mode WAL :
+  ```python
+  connect_args = {"check_same_thread": False, "timeout": 30}
+  engine = create_engine(url, connect_args=connect_args, echo=False)
+  ```
+* **Mode WAL automatique :** Ajoute un écouteur d'événement (event listener) sur l'engine pour forcer le mode WAL et les clés étrangères à chaque connexion :
+  ```python
+  from sqlalchemy import event
+
+  @event.listens_for(engine, "connect")
+  def set_sqlite_pragma(dbapi_connection, connection_record):
+      cursor = dbapi_connection.cursor()
+      cursor.execute("PRAGMA journal_mode=WAL;")
+      cursor.execute("PRAGMA foreign_keys=ON;")
+      cursor.close()
+  ```
+
+## 3. Gestion des Sessions dans FastAPI
+* **Dépendance de Session :** Fournis la session à FastAPI via un générateur (`yield`) pour garantir sa fermeture automatique :
+  ```python
+  def get_session():
+      with Session(engine) as session:
+          yield session
+  ```
+* **Injection moderne :** Utilise systématiquement `Annotated` pour injecter la session dans tes routes : `db: Annotated[Session, Depends(get_session)]`.
+
+## 4. Requêtes et Manipulation de Données
+* **Syntaxe SQLModel :** Utilise la fonction `select()` de `sqlmodel` et non celle de SQLAlchemy (ex: `session.exec(select(User).where(User.email == email)).first()`).
+* **Mise à jour :** Pour mettre à jour un objet à partir d'un schéma d'API, utilise la méthode `.sqlmodel_update()` (compatible Pydantic v2) : `obj.sqlmodel_update(update_data.model_dump(exclude_unset=True))`.
