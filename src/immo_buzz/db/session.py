@@ -47,10 +47,9 @@ def make_engine(database_url: str = DEFAULT_DATABASE_URL) -> Engine:
 
 
 def init_db(engine: Engine) -> None:
-    """Create the tables if they do not exist yet.
+    """Create missing tables from the SQLModel metadata.
 
-    Alembic is not part of the MVP, so the schema is created from the
-    SQLModel metadata. Migrations will be introduced once the model settles.
+    Existing databases are upgraded with ``uv run alembic upgrade head``.
     """
     # Import for the metadata side effect: the table must be registered.
     from immo_buzz.db import models  # noqa: F401

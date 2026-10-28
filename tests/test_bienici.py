@@ -5,15 +5,17 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import httpx
 import pytest
 
 from immo_buzz.db.models import PropertyType
-from immo_buzz.scraper.bienici import API_URL, BieniciSource
+from immo_buzz.scraper.bienici import AD_API_URL, API_URL, BieniciSource
 
 
 class StubResponse:
-    def __init__(self, payload: dict[str, Any]) -> None:
+    def __init__(self, payload: dict[str, Any], status_code: int = 200) -> None:
         self._payload = payload
+        self.status_code = status_code
 
     def raise_for_status(self) -> None:
         return None
@@ -23,20 +25,29 @@ class StubResponse:
 
 
 class StubClient:
-    def __init__(self, payload: dict[str, Any]) -> None:
+    def __init__(self, payload: dict[str, Any], status_code: int = 200) -> None:
         self.payload = payload
+        self.status_code = status_code
         self.calls: list[tuple[str, dict[str, Any]]] = []
 
     def get(self, url: str, params: dict[str, Any] | None = None) -> StubResponse:
         self.calls.append((url, params or {}))
-        return StubResponse(self.payload)
+        return StubResponse(self.payload, self.status_code)
 
     def close(self) -> None:
         return None
 
 
-def make_source(payload: dict[str, Any]) -> tuple[BieniciSource, StubClient]:
-    client = StubClient(payload)
+class FailingClient(StubClient):
+    def get(self, url: str, params: dict[str, Any] | None = None) -> StubResponse:
+        del url, params
+        raise httpx.ConnectError("network unavailable")
+
+
+def make_source(
+    payload: dict[str, Any], *, status_code: int = 200
+) -> tuple[BieniciSource, StubClient]:
+    client = StubClient(payload, status_code=status_code)
     source = BieniciSource(["-58404"], client=client, request_delay_s=0.0)  # type: ignore[arg-type]
     return source, client
 
@@ -66,6 +77,39 @@ def test_fetch_maps_listings_and_skips_unknown_types(
     assert parking.property_type is PropertyType.PARKING
     assert parking.surface is None
     assert parking.energy_class is None
+
+
+def test_is_available_uses_the_ad_detail_api(bienici_payload: dict[str, Any]) -> None:
+    source, client = make_source(bienici_payload)
+
+    assert source.is_available("era-1565943") is True
+    assert client.calls == [(AD_API_URL, {"id": "era-1565943"})]
+
+
+@pytest.mark.parametrize("status_code", [404, 410])
+def test_is_available_detects_removed_ads(
+    bienici_payload: dict[str, Any], status_code: int
+) -> None:
+    source, _ = make_source(bienici_payload, status_code=status_code)
+
+    assert source.is_available("era-missing") is False
+
+
+def test_is_available_returns_unknown_on_server_error(
+    bienici_payload: dict[str, Any],
+) -> None:
+    source, _ = make_source(bienici_payload, status_code=503)
+
+    assert source.is_available("era-1") is None
+
+
+def test_is_available_returns_unknown_on_network_error(
+    bienici_payload: dict[str, Any],
+) -> None:
+    client = FailingClient(bienici_payload)
+    source = BieniciSource(["-58404"], client=client, request_delay_s=0.0)  # type: ignore[arg-type]
+
+    assert source.is_available("era-1") is None
 
 
 def test_filters_encode_types_zones_and_offset(

@@ -1,5 +1,9 @@
 """Scraping layer: sources expose raw listings to the financial engine."""
 
-from immo_buzz.scraper.base import ListingSource, RawListing
+from immo_buzz.scraper.base import (
+    ListingAvailabilityChecker,
+    ListingSource,
+    RawListing,
+)
 
-__all__ = ["ListingSource", "RawListing"]
+__all__ = ["ListingAvailabilityChecker", "ListingSource", "RawListing"]

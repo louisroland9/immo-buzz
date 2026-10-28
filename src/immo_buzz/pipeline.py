@@ -12,11 +12,17 @@ from immo_buzz.db import (
     ListingCreate,
     ListingRead,
     init_db,
+    list_unsold_listings,
     make_engine,
+    mark_listing_sold,
     upsert_listing,
 )
 from immo_buzz.engine import Evaluation, evaluate
-from immo_buzz.scraper.base import ListingSource, RawListing
+from immo_buzz.scraper.base import (
+    ListingAvailabilityChecker,
+    ListingSource,
+    RawListing,
+)
 from immo_buzz.scraper.bienici import BieniciSource
 from immo_buzz.scraper.zones import LILLE_METROPOLE_ZONES, zones_by_name
 
@@ -33,6 +39,7 @@ class PipelineResult:
     created: int = 0
     updated: int = 0
     rejected: int = 0
+    marked_sold: int = 0
     created_listings: list[ListingRead] = field(default_factory=list)
 
 
@@ -67,6 +74,18 @@ class Pipeline:
 
     def _iter_raw_listings(self, max_pages: int) -> list[RawListing]:
         return collect_raw_listings(self.source, max_pages, self.settings.page_size)
+
+    def _mark_sold_listings(self, session: Session) -> int:
+        """Mark known listings whose source URL no longer exists as sold."""
+        if not isinstance(self.source, ListingAvailabilityChecker):
+            return 0
+
+        marked = 0
+        for listing in list_unsold_listings(session, source=self.source.name):
+            if self.source.is_available(listing.source_id) is False:
+                marked += int(mark_listing_sold(session, listing))
+                logger.info("listing %s is no longer available", listing.source_id)
+        return marked
 
     def run(
         self, *, max_pages: int | None = None, dry_run: bool = False
@@ -114,6 +133,7 @@ class Pipeline:
                     # Snapshot the row while the session is still open, so the
                     # result can be rendered after the session is closed.
                     result.created_listings.append(ListingRead.model_validate(listing))
+            result.marked_sold = self._mark_sold_listings(session)
         return result
 
 
@@ -147,6 +167,7 @@ def format_result(result: PipelineResult, min_yield_pct: float) -> str:
         f"Retenues (rendement >= {min_yield_pct:.1f}%) : {result.kept}",
         f"Nouvelles en base : {result.created}",
         f"Mises a jour : {result.updated}",
+        f"Marquees vendues : {result.marked_sold}",
     ]
     for listing in result.created_listings[:10]:
         lines.append(

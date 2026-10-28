@@ -8,7 +8,7 @@ import pytest
 from sqlmodel import Session
 
 from immo_buzz.config import Settings
-from immo_buzz.db import count_listings, make_engine
+from immo_buzz.db import count_listings, list_unsold_listings, make_engine
 from immo_buzz.db.models import PropertyType
 from immo_buzz.engine import evaluate
 from immo_buzz.pipeline import Pipeline, build_listing_create, collect_raw_listings
@@ -30,6 +30,21 @@ class StubSource:
         if page >= len(self._pages):
             return []
         return self._pages[page]
+
+
+class AvailabilityStubSource(StubSource):
+    """Stub source exposing the optional availability checker capability."""
+
+    def __init__(
+        self,
+        pages: list[list[RawListing]],
+        availability: dict[str, bool | None],
+    ) -> None:
+        super().__init__(pages)
+        self._availability = availability
+
+    def is_available(self, source_id: str) -> bool | None:
+        return self._availability.get(source_id)
 
 
 def raw_flat(source_id: str, price: float, surface: float) -> RawListing:
@@ -91,6 +106,42 @@ def test_pipeline_keeps_only_high_yield_and_persists(tmp_path: Path) -> None:
     engine = make_engine(settings.database_url)
     with Session(engine) as session:
         assert count_listings(session) == 1
+
+
+def test_pipeline_marks_disappeared_listing_as_sold(tmp_path: Path) -> None:
+    settings = Settings(
+        database_url=f"sqlite:///{tmp_path / 'sold.db'}",
+        min_yield_pct=8.0,
+        max_pages=1,
+    )
+    first_source = AvailabilityStubSource([[raw_parking("cheap")]], {})
+    assert Pipeline(first_source, settings).run().created == 1
+
+    second_source = AvailabilityStubSource([], {"cheap": False})
+    result = Pipeline(second_source, settings).run()
+
+    assert result.marked_sold == 1
+    engine = make_engine(settings.database_url)
+    with Session(engine) as session:
+        assert list_unsold_listings(session) == []
+
+
+def test_pipeline_keeps_listing_when_availability_is_unknown(tmp_path: Path) -> None:
+    settings = Settings(
+        database_url=f"sqlite:///{tmp_path / 'unknown.db'}",
+        min_yield_pct=8.0,
+        max_pages=1,
+    )
+    first_source = AvailabilityStubSource([[raw_parking("cheap")]], {})
+    assert Pipeline(first_source, settings).run().created == 1
+
+    second_source = AvailabilityStubSource([], {"cheap": None})
+    result = Pipeline(second_source, settings).run()
+
+    assert result.marked_sold == 0
+    engine = make_engine(settings.database_url)
+    with Session(engine) as session:
+        assert [item.source_id for item in list_unsold_listings(session)] == ["cheap"]
 
 
 def test_dry_run_writes_nothing(tmp_path: Path) -> None:

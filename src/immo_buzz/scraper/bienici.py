@@ -25,6 +25,7 @@ from immo_buzz.scraper.base import RawListing
 logger = logging.getLogger(__name__)
 
 API_URL = "https://www.bienici.com/realEstateAds.json"
+AD_API_URL = "https://www.bienici.com/realEstateAd.json"
 AD_BASE_URL = "https://www.bienici.com/annonce"
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -124,6 +125,36 @@ class BieniciSource:
             time.sleep(self._delay)
 
         return [listing for ad in ads if (listing := self._map_ad(ad)) is not None]
+
+    def is_available(self, source_id: str) -> bool | None:
+        """Check whether an ad still exists on Bien'ici.
+
+        The public listing page is a single-page application that always
+        answers ``200``, even for unknown ids. Its detail API does return
+        ``404`` for removed ads, so it is the reliable availability signal.
+        """
+        try:
+            response = self._client.get(AD_API_URL, params={"id": source_id})
+        except httpx.HTTPError as exc:
+            logger.warning(
+                "bienici: availability check failed for %s: %s", source_id, exc
+            )
+            return None
+
+        if self._delay > 0:
+            time.sleep(self._delay)
+
+        if response.status_code in (404, 410):
+            return False
+        if 200 <= response.status_code < 300:
+            return True
+
+        logger.warning(
+            "bienici: unexpected status %s while checking %s",
+            response.status_code,
+            source_id,
+        )
+        return None
 
     def _map_ad(self, ad: dict[str, Any]) -> RawListing | None:
         raw_type = str(ad.get("propertyType", "")).lower()

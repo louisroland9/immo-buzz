@@ -7,7 +7,14 @@ Scrapper de projets immobiliers à haut potentiel sur la métropole lilloise.
 `uv run immo-buzz` (ou `uv run python -m immo_buzz`) récupère les annonces de
 vente de la métropole lilloise via l'API JSON de Bien'ici, calcule un rendement
 locatif brut estimé pour chacune, puis stocke en SQLite celles qui atteignent le
-seuil de rendement.
+seuil de rendement. Les annonces dont l'URL n'existe plus sont marquées
+`sold = true` (vendues).
+
+Pour mettre à niveau une base existante :
+
+```bash
+uv run alembic upgrade head
+```
 
 ```
 # Analyse complète, sans écriture en base

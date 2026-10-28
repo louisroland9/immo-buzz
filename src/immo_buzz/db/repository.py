@@ -30,11 +30,38 @@ def upsert_listing(session: Session, payload: ListingCreate) -> tuple[Listing, b
         return listing, True
 
     existing.sqlmodel_update(payload.model_dump(exclude={"source", "source_id"}))
+    # Seeing the ad again means it is back on the market.
+    existing.sold = False
     existing.updated_at = datetime.now(UTC)
     session.add(existing)
     session.commit()
     session.refresh(existing)
     return existing, False
+
+
+def list_unsold_listings(
+    session: Session, *, source: str | None = None
+) -> list[Listing]:
+    """Return active listings, optionally restricted to one source."""
+    statement = select(Listing).where(col(Listing.sold).is_(False))
+    if source is not None:
+        statement = statement.where(Listing.source == source)
+    return list(session.exec(statement).all())
+
+
+def mark_listing_sold(session: Session, listing: Listing) -> bool:
+    """Mark an unavailable listing as sold.
+
+    Returns ``True`` only when the state actually changed.
+    """
+    if listing.sold:
+        return False
+    listing.sold = True
+    listing.updated_at = datetime.now(UTC)
+    session.add(listing)
+    session.commit()
+    session.refresh(listing)
+    return True
 
 
 def list_listings(

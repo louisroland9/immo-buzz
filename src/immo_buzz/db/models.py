@@ -53,6 +53,7 @@ class ListingRead(ListingBase):
     """Shape returned by future API endpoints."""
 
     id: int
+    sold: bool
     discovered_at: datetime
     updated_at: datetime
 
@@ -65,5 +66,6 @@ class Listing(ListingBase, table=True):
     )
 
     id: int | None = Field(default=None, primary_key=True)
+    sold: bool = Field(default=False, index=True)
     discovered_at: datetime = Field(default_factory=_utc_now)
     updated_at: datetime = Field(default_factory=_utc_now)

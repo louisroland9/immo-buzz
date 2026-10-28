@@ -8,7 +8,14 @@ from pathlib import Path
 import pytest
 from sqlmodel import Session, create_engine
 
-from immo_buzz.db import ListingCreate, count_listings, list_listings, upsert_listing
+from immo_buzz.db import (
+    ListingCreate,
+    count_listings,
+    list_listings,
+    list_unsold_listings,
+    mark_listing_sold,
+    upsert_listing,
+)
 from immo_buzz.db.models import PropertyType
 from immo_buzz.db.session import init_db
 
@@ -42,6 +49,7 @@ def test_upsert_creates_then_updates(session: Session) -> None:
     listing, created = upsert_listing(session, make_payload())
     assert created is True
     assert listing.id is not None
+    assert listing.sold is False
     discovered_at = listing.discovered_at
 
     same, created_again = upsert_listing(
@@ -53,6 +61,27 @@ def test_upsert_creates_then_updates(session: Session) -> None:
     assert same.estimated_yield == 10.4
     assert same.discovered_at == discovered_at
     assert count_listings(session) == 1
+
+
+def test_mark_listing_sold_and_reactivate_on_upsert(session: Session) -> None:
+    listing, _ = upsert_listing(session, make_payload())
+
+    assert mark_listing_sold(session, listing) is True
+    assert listing.sold is True
+    assert list_unsold_listings(session) == []
+
+    reactivated, created = upsert_listing(session, make_payload())
+    assert created is False
+    assert reactivated.sold is False
+    assert [item.source_id for item in list_unsold_listings(session)] == ["era-1"]
+
+
+def test_list_unsold_listings_filters_by_source(session: Session) -> None:
+    upsert_listing(session, make_payload(source_id="bienici-1"))
+    upsert_listing(session, make_payload(source="seloger", source_id="seloger-1"))
+
+    unsold = list_unsold_listings(session, source="bienici")
+    assert [item.source_id for item in unsold] == ["bienici-1"]
 
 
 def test_unique_constraint_on_source_and_source_id(session: Session) -> None:

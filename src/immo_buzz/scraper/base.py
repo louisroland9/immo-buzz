@@ -44,3 +44,18 @@ class ListingSource(Protocol):
     ) -> list[RawListing]:  # pragma: no cover - protocol definition
         """Return raw listings for the given page."""
         ...
+
+
+@runtime_checkable
+class ListingAvailabilityChecker(Protocol):
+    """Optional capability used to detect listings removed from the source."""
+
+    def is_available(
+        self, source_id: str
+    ) -> bool | None:  # pragma: no cover - protocol definition
+        """Return ``False`` when the listing no longer exists.
+
+        ``None`` means the availability could not be determined (network error,
+        rate limiting, server error) and must not mark the listing as sold.
+        """
+        ...
