@@ -177,7 +177,11 @@ def test_pipeline_deduplicates_across_pages(tmp_path: Path) -> None:
 def test_build_listing_create_projects_evaluation() -> None:
     listing = raw_flat("x", 60_000.0, 25.0)
     payload = build_listing_create(listing, evaluate(listing))
-    assert payload.estimated_yield == pytest.approx(7.87)
+    assert payload.estimated_gross_yield == pytest.approx(8.33)
+    assert payload.estimated_net_yield is not None
+    assert payload.estimated_net_yield < payload.estimated_gross_yield
+    assert payload.estimated_property_tax == pytest.approx(60_000 * 0.0080)
+    assert payload.estimated_condo_fees == pytest.approx(1.8 * 25 * 12)
     assert payload.detected_condition == "bon"
     assert payload.source_id == "x"
     assert payload.total_cost == pytest.approx(64_800.0)

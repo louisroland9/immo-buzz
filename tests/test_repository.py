@@ -39,7 +39,7 @@ def make_payload(**overrides: object) -> ListingCreate:
         "surface": 25.0,
         "city": "Lille",
         "url": "https://www.bienici.com/annonce/era-1",
-        "estimated_yield": 9.5,
+        "estimated_gross_yield": 9.5,
     }
     payload.update(overrides)
     return ListingCreate(**payload)  # type: ignore[arg-type]
@@ -53,12 +53,12 @@ def test_upsert_creates_then_updates(session: Session) -> None:
     discovered_at = listing.discovered_at
 
     same, created_again = upsert_listing(
-        session, make_payload(price=55_000.0, estimated_yield=10.4)
+        session, make_payload(price=55_000.0, estimated_gross_yield=10.4)
     )
     assert created_again is False
     assert same.id == listing.id
     assert same.price == 55_000.0
-    assert same.estimated_yield == 10.4
+    assert same.estimated_gross_yield == 10.4
     assert same.discovered_at == discovered_at
     assert count_listings(session) == 1
 
@@ -91,10 +91,10 @@ def test_unique_constraint_on_source_and_source_id(session: Session) -> None:
 
 
 def test_list_listings_filters_and_orders(session: Session) -> None:
-    upsert_listing(session, make_payload(source_id="a", estimated_yield=9.0))
-    upsert_listing(session, make_payload(source_id="b", estimated_yield=12.0))
+    upsert_listing(session, make_payload(source_id="a", estimated_gross_yield=9.0))
+    upsert_listing(session, make_payload(source_id="b", estimated_gross_yield=12.0))
     upsert_listing(
-        session, make_payload(source_id="c", city="Roubaix", estimated_yield=15.0)
+        session, make_payload(source_id="c", city="Roubaix", estimated_gross_yield=15.0)
     )
 
     lille_only = list_listings(session, city="Lille")
