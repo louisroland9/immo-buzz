@@ -5,18 +5,23 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from immo_buzz.config import (
+    DEFAULT_MANAGEMENT_FEE_RATE,
     DEFAULT_MAX_YIELD_PCT,
     DEFAULT_MIN_YIELD_PCT,
+    DEFAULT_MORTGAGE_ANNUAL_RATE,
     DEFAULT_NOTARY_FEE_RATE,
+    DEFAULT_VACANCY_RATE,
 )
 from immo_buzz.db.models import PropertyType
 from immo_buzz.engine.condition import detect_condition
 from immo_buzz.engine.grids import (
     CONDITION_LABELS,
     CONDITION_RENT_FACTOR,
-    WORKS_COST_EUR_PER_M2,
     Condition,
+    condo_fees_eur_per_m2_month,
     estimate_monthly_rent,
+    estimate_works_cost,
+    property_tax_rate,
 )
 from immo_buzz.scraper.base import RawListing
 
@@ -27,7 +32,13 @@ PARKING_TYPOLOGIES = (PropertyType.PARKING,)
 
 @dataclass(frozen=True)
 class Evaluation:
-    """Result of the financial assessment of a single listing."""
+    """Result of the financial assessment of a single listing.
+
+    Acquisition cost is the price plus notary fees plus the works budget.
+    ``annual_rent`` is the gross rental income, while the operating costs
+    (condominium fees, property tax, management fees and vacancy) are
+    subtracted to derive the net income.
+    """
 
     condition: Condition
     condition_label: str
@@ -36,15 +47,25 @@ class Evaluation:
     notary_fees: float
     works_cost: float
     total_cost: float
+    condo_fees_annual: float
+    property_tax: float
+    management_fees: float
+    vacancy_cost: float
+    net_annual_income: float
     gross_yield_pct: float
+    net_yield_pct: float
+    cash_flow_monthly: float
     is_high_potential: bool
     rejection_reason: str | None = None
 
 
-def _estimate_works_cost(condition: Condition, surface: float) -> float:
-    if condition in (Condition.GOOD, Condition.REFRESH):
-        return 0.0
-    return WORKS_COST_EUR_PER_M2[condition] * surface
+def _estimate_monthly_mortgage(price: float) -> float:
+    """Proxy of the monthly loan payment used for the cash flow estimate.
+
+    A fixed rate, full financing and a constant monthly payment model keeps
+    the cash flow a transparent, editable hypothesis.
+    """
+    return price * DEFAULT_MORTGAGE_ANNUAL_RATE / 12
 
 
 def evaluate(
@@ -53,14 +74,18 @@ def evaluate(
     min_yield_pct: float = DEFAULT_MIN_YIELD_PCT,
     max_yield_pct: float = DEFAULT_MAX_YIELD_PCT,
     notary_fee_rate: float = DEFAULT_NOTARY_FEE_RATE,
+    management_fee_rate: float = DEFAULT_MANAGEMENT_FEE_RATE,
+    vacancy_rate: float = DEFAULT_VACANCY_RATE,
 ) -> Evaluation:
     """Assess a raw listing and decide whether it is worth storing.
 
     Total purchase cost is the asking price plus notary fees plus the works
-    budget. The gross yield is the annual rent divided by that total cost.
+    budget. The gross yield is the annual rent divided by that total cost;
+    the net yield subtracts the operating costs (condo fees, property tax,
+    management fees and vacancy). Filtering stays based on the gross yield.
     """
     text = f"{listing.title} {listing.description or ''}"
-    condition = detect_condition(text, listing.energy_class)
+    condition = detect_condition(text, listing.energy_class, listing.works_signalled)
     factor = CONDITION_RENT_FACTOR[condition]
 
     if listing.property_type is PropertyType.PARKING:
@@ -73,35 +98,63 @@ def evaluate(
     if listing.price <= 0:
         return _rejected(listing, condition, "prix manquant ou nul")
 
-    monthly_rent = estimate_monthly_rent(listing.property_type, surface) * factor
+    monthly_rent = (
+        estimate_monthly_rent(listing.property_type, surface, listing.city) * factor
+    )
     annual_rent = monthly_rent * 12
     notary_fees = listing.price * notary_fee_rate
-    works_cost = _estimate_works_cost(condition, surface)
+    works_cost = estimate_works_cost(
+        condition,
+        surface,
+        energy_class=listing.energy_class,
+        price=listing.price,
+    )
     total_cost = listing.price + notary_fees + works_cost
     gross_yield = annual_rent / total_cost * 100
+
+    condo_fees_annual = (
+        condo_fees_eur_per_m2_month(listing.property_type) * surface * 12
+    )
+    property_tax = listing.price * property_tax_rate(listing.city)
+    management_fees = annual_rent * management_fee_rate
+    vacancy_cost = annual_rent * vacancy_rate
+    net_annual_income = (
+        annual_rent - condo_fees_annual - property_tax - management_fees - vacancy_cost
+    )
+    net_yield = net_annual_income / total_cost * 100
+    cash_flow_monthly = net_annual_income / 12 - _estimate_monthly_mortgage(
+        listing.price
+    )
+
+    breakdown = {
+        "monthly_rent": monthly_rent,
+        "notary_fees": notary_fees,
+        "works_cost": works_cost,
+        "total_cost": total_cost,
+        "condo_fees_annual": condo_fees_annual,
+        "property_tax": property_tax,
+        "management_fees": management_fees,
+        "vacancy_cost": vacancy_cost,
+        "net_annual_income": net_annual_income,
+        "gross_yield_pct": gross_yield,
+        "net_yield_pct": net_yield,
+        "cash_flow_monthly": cash_flow_monthly,
+    }
 
     if gross_yield > max_yield_pct:
         return _rejected(
             listing,
             condition,
             f"rendement invraisemblable ({gross_yield:.1f}%) - donnees suspectes",
-            monthly_rent=monthly_rent,
-            notary_fees=notary_fees,
-            works_cost=works_cost,
-            total_cost=total_cost,
-            gross_yield=gross_yield,
+            **breakdown,
         )
 
     return Evaluation(
         condition=condition,
         condition_label=CONDITION_LABELS[condition],
-        monthly_rent=monthly_rent,
         annual_rent=annual_rent,
-        notary_fees=notary_fees,
-        works_cost=works_cost,
-        total_cost=total_cost,
-        gross_yield_pct=gross_yield,
         is_high_potential=gross_yield >= min_yield_pct,
+        **breakdown,
     )
 
 
@@ -114,7 +167,14 @@ def _rejected(
     notary_fees: float = 0.0,
     works_cost: float = 0.0,
     total_cost: float = 0.0,
-    gross_yield: float = 0.0,
+    condo_fees_annual: float = 0.0,
+    property_tax: float = 0.0,
+    management_fees: float = 0.0,
+    vacancy_cost: float = 0.0,
+    net_annual_income: float = 0.0,
+    gross_yield_pct: float = 0.0,
+    net_yield_pct: float = 0.0,
+    cash_flow_monthly: float = 0.0,
 ) -> Evaluation:
     del listing  # only kept for call site symmetry
     return Evaluation(
@@ -125,7 +185,14 @@ def _rejected(
         notary_fees=notary_fees,
         works_cost=works_cost,
         total_cost=total_cost,
-        gross_yield_pct=gross_yield,
+        condo_fees_annual=condo_fees_annual,
+        property_tax=property_tax,
+        management_fees=management_fees,
+        vacancy_cost=vacancy_cost,
+        net_annual_income=net_annual_income,
+        gross_yield_pct=gross_yield_pct,
+        net_yield_pct=net_yield_pct,
+        cash_flow_monthly=cash_flow_monthly,
         is_high_potential=False,
         rejection_reason=reason,
     )

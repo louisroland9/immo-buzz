@@ -188,6 +188,7 @@ class BieniciSource:
             description=ad.get("description") or None,
             rooms=_as_int(ad.get("roomsQuantity")),
             energy_class=_as_energy_class(ad.get("energyClassification")),
+            works_signalled=_as_bool(ad.get("workToDo")),
             published_at=_parse_datetime(ad.get("publicationDate")),
         )
 
@@ -234,6 +235,12 @@ def _as_energy_class(value: Any) -> str | None:
     if not value:
         return None
     return str(value).strip().upper()
+
+
+def _as_bool(value: Any) -> bool | None:
+    if value is None:
+        return None
+    return bool(value)
 
 
 def _parse_datetime(value: Any) -> datetime | None:

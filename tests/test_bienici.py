@@ -79,6 +79,20 @@ def test_fetch_maps_listings_and_skips_unknown_types(
     assert parking.energy_class is None
 
 
+def test_fetch_maps_work_to_do_and_energy_class(
+    bienici_payload: dict[str, Any],
+) -> None:
+    source, _ = make_source(bienici_payload)
+    listings = source.fetch(page=0, page_size=100)
+
+    flat, house, parking = listings
+    assert flat.works_signalled is False
+    assert flat.energy_class == "C"
+    assert house.works_signalled is True
+    assert house.energy_class == "F"
+    assert parking.works_signalled is None
+
+
 def test_is_available_uses_the_ad_detail_api(bienici_payload: dict[str, Any]) -> None:
     source, client = make_source(bienici_payload)
 

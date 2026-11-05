@@ -74,10 +74,10 @@ def list_listings(
     """Return stored listings, best yield first."""
     statement = select(Listing)
     if min_yield is not None:
-        statement = statement.where(col(Listing.estimated_yield) >= min_yield)
+        statement = statement.where(col(Listing.estimated_gross_yield) >= min_yield)
     if city is not None:
         statement = statement.where(Listing.city == city)
-    statement = statement.order_by(col(Listing.estimated_yield).desc())
+    statement = statement.order_by(col(Listing.estimated_gross_yield).desc())
     if limit is not None:
         statement = statement.limit(limit)
     return list(session.exec(statement).all())
