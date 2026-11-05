@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import unicodedata
 
-from immo_buzz.engine.grids import Condition
+from immo_buzz.engine.grids import POOR_ENERGY_CLASSES, Condition
 
 # Ordered from the most severe to the lightest pattern so the worst signals
 # win when several keywords appear in the same description.
@@ -57,8 +57,6 @@ CONDITION_KEYWORDS: tuple[tuple[Condition, tuple[str, ...]], ...] = (
         ),
     ),
 )
-
-POOR_ENERGY_CLASSES: frozenset[str] = frozenset({"F", "G"})
 
 _NON_WORD = re.compile(r"[^a-z0-9]+")
 

@@ -41,13 +41,37 @@ CONDITION_LABELS: dict[Condition, str] = {
     Condition.HEAVY: "Rénovation lourde (structure, toiture, réseaux)",
 }
 
-# Works budget in euros per square metre, by renovation intensity.
+# Renovation works budget, split into a fixed cost per dwelling (kitchen,
+# bathroom, electrical panel...) and a variable cost per square metre (floors,
+# paint, insulation...). Order of magnitudes inspired by FNAIM / ANIL renovation
+# cost guides for the Lille area:
+#   - rafraichissement : simple refresh, mostly paint and floor
+#   - renovation : kitchen, bathroom, electricity
+#   - lourd : structure, roof, networks
+# GOOD has no works at all, REFRESH keeps a real (non zero) budget.
+WORKS_FIXED_COST_EUR: dict[Condition, float] = {
+    Condition.GOOD: 0.0,
+    Condition.REFRESH: 1_000.0,
+    Condition.RENOVATION: 6_000.0,
+    Condition.HEAVY: 12_000.0,
+}
+
 WORKS_COST_EUR_PER_M2: dict[Condition, float] = {
     Condition.GOOD: 0.0,
-    Condition.REFRESH: 150.0,
-    Condition.RENOVATION: 450.0,
-    Condition.HEAVY: 800.0,
+    Condition.REFRESH: 100.0,
+    Condition.RENOVATION: 400.0,
+    Condition.HEAVY: 700.0,
 }
+
+# Average works intensity applied to a verified energy renovation (DPE F/G)
+# that the listing text does not already describe as a heavy renovation.
+WORKS_ENERGY_PREMIUM_EUR_PER_M2: float = 120.0
+
+# Safety rails: the works budget cannot exceed this share of the asking price,
+# and its per square metre value is capped to avoid runaway estimates on large
+# or mistyped surfaces.
+WORKS_COST_MAX_RATIO_OF_PRICE: float = 0.6
+WORKS_COST_MAX_EUR_PER_M2: float = 1_200.0
 
 # Monthly rent for a single parking spot: surface data is unreliable.
 PARKING_MONTHLY_RENT: float = 70.0
@@ -251,3 +275,39 @@ def condo_fees_eur_per_m2_month(property_type: PropertyType) -> float:
     if property_type in (PropertyType.FLAT, PropertyType.BUILDING):
         return CONDO_FEES_EUR_PER_M2_MONTH
     return 0.0
+
+
+POOR_ENERGY_CLASSES: frozenset[str] = frozenset({"F", "G"})
+
+
+def estimate_works_cost(
+    condition: Condition,
+    surface: float,
+    *,
+    energy_class: str | None = None,
+    price: float = 0.0,
+) -> float:
+    """Estimate the renovation works budget of a listing.
+
+    The budget combines a fixed cost per dwelling and a variable cost per
+    square metre, both driven by the renovation intensity. A poor energy label
+    adds an energy renovation premium unless the condition is already ``HEAVY``
+    (the worst case already covers it). The result is capped by a per square
+    metre ceiling and by a share of the asking price to keep estimates sane.
+    """
+    if condition is Condition.GOOD:
+        return 0.0
+
+    budget = (
+        WORKS_FIXED_COST_EUR[condition] + WORKS_COST_EUR_PER_M2[condition] * surface
+    )
+
+    label = (energy_class or "").strip().upper()
+    if label in POOR_ENERGY_CLASSES and condition is not Condition.HEAVY:
+        budget += WORKS_ENERGY_PREMIUM_EUR_PER_M2 * surface
+
+    if surface > 0:
+        budget = min(budget, WORKS_COST_MAX_EUR_PER_M2 * surface)
+    if price > 0:
+        budget = min(budget, price * WORKS_COST_MAX_RATIO_OF_PRICE)
+    return budget
