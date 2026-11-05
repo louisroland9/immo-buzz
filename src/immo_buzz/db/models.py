@@ -36,6 +36,10 @@ class ListingBase(SQLModel):
     district: str | None = None
     url: str
 
+    description: str | None = None
+    energy_class: str | None = None
+    works_signalled: bool | None = None
+
     detected_condition: str | None = None
     estimated_monthly_rent: float | None = None
     estimated_works_cost: float | None = None
