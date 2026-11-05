@@ -107,9 +107,78 @@ def test_heavy_renovation_income_tax_on_yield() -> None:
     )
     result = evaluate(listing)
     assert result.condition is Condition.HEAVY
-    assert result.works_cost == pytest.approx(800.0 * 200)
-    assert result.total_cost == pytest.approx(200_000 + 16_000 + 160_000)
+    # Fixed 12 000 EUR + 700 EUR/m2 * 200 m2 = 152 000, capped to 60% of price.
+    assert result.works_cost == pytest.approx(200_000 * 0.6)
+    assert result.total_cost == pytest.approx(200_000 + 16_000 + 120_000)
     assert result.gross_yield_pct < 8.0
+
+
+def test_refresh_condition_applies_a_non_zero_works_budget() -> None:
+    listing = make_listing(title="Studio a rafraichir", price=80_000.0, surface=30.0)
+    result = evaluate(listing)
+    assert result.condition is Condition.REFRESH
+    # Fixed 1 000 EUR + 100 EUR/m2 * 30 m2 = 4 000, below the price cap.
+    assert result.works_cost == pytest.approx(1_000.0 + 100.0 * 30.0)
+
+
+def test_works_cost_uses_fixed_and_variable_parts() -> None:
+    small = make_listing(
+        title="Appartement a renover",
+        price=150_000.0,
+        surface=20.0,
+        energy_class="C",
+    )
+    large = make_listing(
+        title="Appartement a renover",
+        price=150_000.0,
+        surface=100.0,
+        energy_class="C",
+    )
+    small_cost = evaluate(small).works_cost
+    large_cost = evaluate(large).works_cost
+    assert small_cost == pytest.approx(6_000.0 + 400.0 * 20.0)
+    assert large_cost == pytest.approx(6_000.0 + 400.0 * 100.0)
+    # The fixed part makes the small dwelling relatively more expensive per m2.
+    assert small_cost / 20.0 > large_cost / 100.0
+
+
+def test_poor_energy_class_adds_a_works_premium() -> None:
+    base = make_listing(
+        title="Appartement lumineux",
+        price=150_000.0,
+        surface=40.0,
+        energy_class="D",
+    )
+    poor = make_listing(
+        title="Appartement lumineux",
+        price=150_000.0,
+        surface=40.0,
+        energy_class="G",
+    )
+    # A poor label alone triggers RENOVATION and adds the energy premium.
+    base_result = evaluate(base)
+    poor_result = evaluate(poor)
+    assert base_result.condition is Condition.GOOD
+    assert poor_result.condition is Condition.RENOVATION
+    assert poor_result.works_cost > base_result.works_cost
+
+
+def test_works_cost_is_capped_by_price_ratio() -> None:
+    listing = make_listing(
+        title="Immeuble a restaurer",
+        property_type=PropertyType.BUILDING,
+        price=50_000.0,
+        surface=300.0,
+    )
+    result = evaluate(listing)
+    assert result.works_cost == pytest.approx(50_000 * 0.6)
+
+
+def test_good_condition_has_no_works() -> None:
+    listing = make_listing(price=120_000.0, surface=50.0, energy_class="C")
+    result = evaluate(listing)
+    assert result.condition is Condition.GOOD
+    assert result.works_cost == 0.0
 
 
 def test_high_potential_above_threshold() -> None:
