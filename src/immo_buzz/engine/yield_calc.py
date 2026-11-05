@@ -85,7 +85,7 @@ def evaluate(
     management fees and vacancy). Filtering stays based on the gross yield.
     """
     text = f"{listing.title} {listing.description or ''}"
-    condition = detect_condition(text, listing.energy_class)
+    condition = detect_condition(text, listing.energy_class, listing.works_signalled)
     factor = CONDITION_RENT_FACTOR[condition]
 
     if listing.property_type is PropertyType.PARKING:

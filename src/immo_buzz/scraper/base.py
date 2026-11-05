@@ -30,6 +30,7 @@ class RawListing(BaseModel):
     description: str | None = None
     rooms: int | None = None
     energy_class: str | None = None
+    works_signalled: bool | None = None
     published_at: datetime | None = None
 
 
