@@ -40,7 +40,10 @@ class ListingBase(SQLModel):
     estimated_monthly_rent: float | None = None
     estimated_works_cost: float | None = None
     total_cost: float | None = None
-    estimated_yield: float | None = Field(default=None, index=True)
+    estimated_gross_yield: float | None = Field(default=None, index=True)
+    estimated_net_yield: float | None = Field(default=None, index=True)
+    estimated_property_tax: float | None = None
+    estimated_condo_fees: float | None = None
 
     published_at: datetime | None = None
 
