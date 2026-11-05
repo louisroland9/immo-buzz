@@ -103,6 +103,8 @@ class Pipeline:
                 min_yield_pct=self.settings.min_yield_pct,
                 max_yield_pct=self.settings.max_yield_pct,
                 notary_fee_rate=self.settings.notary_fee_rate,
+                management_fee_rate=self.settings.management_fee_rate,
+                vacancy_rate=self.settings.vacancy_rate,
             )
             result.evaluated += 1
             if evaluation.rejection_reason is not None:
@@ -154,7 +156,10 @@ def build_listing_create(raw: RawListing, evaluation: Evaluation) -> ListingCrea
         estimated_monthly_rent=round(evaluation.monthly_rent, 2),
         estimated_works_cost=round(evaluation.works_cost, 2),
         total_cost=round(evaluation.total_cost, 2),
-        estimated_yield=round(evaluation.gross_yield_pct, 2),
+        estimated_gross_yield=round(evaluation.gross_yield_pct, 2),
+        estimated_net_yield=round(evaluation.net_yield_pct, 2),
+        estimated_property_tax=round(evaluation.property_tax, 2),
+        estimated_condo_fees=round(evaluation.condo_fees_annual, 2),
         published_at=raw.published_at,
     )
 
@@ -171,7 +176,8 @@ def format_result(result: PipelineResult, min_yield_pct: float) -> str:
     ]
     for listing in result.created_listings[:10]:
         lines.append(
-            f"  - {listing.estimated_yield:.1f}% | {listing.city} | "
+            f"  - {listing.estimated_gross_yield:.1f}% brut / "
+            f"{listing.estimated_net_yield:.1f}% net | {listing.city} | "
             f"{listing.price:.0f} EUR | {listing.title[:60]} | {listing.url}"
         )
     return "\n".join(lines)

@@ -21,7 +21,21 @@ DEFAULT_MIN_YIELD_PCT = 8.0
 
 # Above this value the data is almost always wrong (viager, bare ownership,
 # parking bundle, mistyped surface...), so the listing is rejected.
-DEFAULT_MAX_YIELD_PCT = 20.0
+DEFAULT_MAX_YIELD_PCT = 40.0
+
+# --- Operating costs (used to derive the net yield) ----------------------
+# Condominium fees (non recoverable), property tax rate and management fees
+# are defined per commune in ``engine/grids.py``. The settings below tune the
+# remaining hypotheses.
+# Management fee as a fraction of the annual gross rent.
+DEFAULT_MANAGEMENT_FEE_RATE = 0.07
+
+# Vacancy allowance as a fraction of the annual gross rent.
+DEFAULT_VACANCY_RATE = 0.04
+
+# Annual mortgage rate used for the indicative cash-flow estimate
+# (full financing, constant monthly payment model).
+DEFAULT_MORTGAGE_ANNUAL_RATE = 0.035
 
 # --- Scraping ------------------------------------------------------------
 DEFAULT_REQUEST_DELAY_S = 1.0
@@ -39,6 +53,9 @@ class Settings:
     min_yield_pct: float = DEFAULT_MIN_YIELD_PCT
     max_yield_pct: float = DEFAULT_MAX_YIELD_PCT
     notary_fee_rate: float = DEFAULT_NOTARY_FEE_RATE
+    management_fee_rate: float = DEFAULT_MANAGEMENT_FEE_RATE
+    vacancy_rate: float = DEFAULT_VACANCY_RATE
+    mortgage_annual_rate: float = DEFAULT_MORTGAGE_ANNUAL_RATE
     request_delay_s: float = DEFAULT_REQUEST_DELAY_S
     max_pages: int = DEFAULT_MAX_PAGES
     page_size: int = DEFAULT_PAGE_SIZE
@@ -55,6 +72,13 @@ def load_settings() -> Settings:
         "min_yield_pct": float(_env("MIN_YIELD_PCT", str(DEFAULT_MIN_YIELD_PCT))),
         "max_yield_pct": float(_env("MAX_YIELD_PCT", str(DEFAULT_MAX_YIELD_PCT))),
         "notary_fee_rate": float(_env("NOTARY_FEE_RATE", str(DEFAULT_NOTARY_FEE_RATE))),
+        "management_fee_rate": float(
+            _env("MANAGEMENT_FEE_RATE", str(DEFAULT_MANAGEMENT_FEE_RATE))
+        ),
+        "vacancy_rate": float(_env("VACANCY_RATE", str(DEFAULT_VACANCY_RATE))),
+        "mortgage_annual_rate": float(
+            _env("MORTGAGE_ANNUAL_RATE", str(DEFAULT_MORTGAGE_ANNUAL_RATE))
+        ),
         "request_delay_s": float(_env("REQUEST_DELAY_S", str(DEFAULT_REQUEST_DELAY_S))),
         "max_pages": int(_env("MAX_PAGES", str(DEFAULT_MAX_PAGES))),
         "page_size": int(_env("PAGE_SIZE", str(DEFAULT_PAGE_SIZE))),
