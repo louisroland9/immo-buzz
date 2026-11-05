@@ -40,6 +40,29 @@ def test_detect_condition_from_keywords(text: str, expected: Condition) -> None:
     assert detect_condition(text) is expected
 
 
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        # Free phrasing that the fixed keyword list used to miss.
+        ("Pour investisseur, maison louée, travaux à faire.", Condition.RENOVATION),
+        ("Budget travaux de rénovation à prévoir.", Condition.RENOVATION),
+        ("Travaux de rénovation à prévoir", Condition.RENOVATION),
+        ("Travaux à réaliser", Condition.RENOVATION),
+        ("Travaux de rafraîchissement à prévoir", Condition.REFRESH),
+        ("Gros travaux à prévoir", Condition.HEAVY),
+        ("Travaux importants à engager", Condition.HEAVY),
+        ("Travaux à entreprendre", Condition.RENOVATION),
+        # No renovation family token: must stay good.
+        ("Appartement lumineux refait à neuf", Condition.GOOD),
+        ("Beaux volumes, cuisine équipée", Condition.GOOD),
+    ],
+)
+def test_detect_condition_from_token_cooccurrence(
+    text: str, expected: Condition
+) -> None:
+    assert detect_condition(text) is expected
+
+
 def test_poor_energy_class_triggers_renovation() -> None:
     assert detect_condition("Appartement lumineux", "G") is Condition.RENOVATION
     assert detect_condition("Appartement lumineux", "F") is Condition.RENOVATION
