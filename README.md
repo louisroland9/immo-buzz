@@ -30,7 +30,8 @@ uv run immo-buzz --commune Lille --commune Roubaix
 ## Calcul du rendement
 
 ```
-prix_total   = prix + 8% de frais de notaire + travaux (€/m² selon l'état déduit)
+prix_total   = prix + 8% de frais de notaire + travaux
+               travaux = coût_fixe(état) + coût_m²(état) × surface + prime DPE F/G
 loyer_brut   = loyer_mensuel_estimé * 12
 charges      = copro (€/m²/mois) + taxe_foncière (% du prix) + gestion (7% loyer) + vacance (4% loyer)
 loyer_net    = loyer_brut - charges
@@ -43,7 +44,13 @@ rendement_net  = loyer_net  / prix_total * 100
   ANIL/DGALN 2023 croisée avec l'OLL de la MEL (constantes éditables dans
   `src/immo_buzz/engine/grids.py`, fallback métropole si la commune est inconnue).
 - L'**état du bien** est déduit des mots-clés du titre et de la description, avec
-  le DPE en signal secondaire.
+  le DPE en signal secondaire (un DPE F/G déclenche un état « rénovation » et
+  majore le budget travaux d'une prime de rénovation énergétique).
+- Le **budget travaux** combine un **coût fixe par logement** (cuisine, salle
+  d'eau, électricité) et un **coût variable au m²** selon l'intensité de
+  rénovation, puis est borné (plafond au m² et ratio maximal du prix). Les
+  ordres de grandeur s'inspirent des guides FNAIM/ANIL (constantes éditables
+  dans `src/immo_buzz/engine/grids.py`).
 - La **taxe foncière** est estimée comme un taux effectif appliqué au prix
   d'acquisition, par commune (DGFiP, simplification de la valeur locative
   cadastrale).

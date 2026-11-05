@@ -17,10 +17,10 @@ from immo_buzz.engine.condition import detect_condition
 from immo_buzz.engine.grids import (
     CONDITION_LABELS,
     CONDITION_RENT_FACTOR,
-    WORKS_COST_EUR_PER_M2,
     Condition,
     condo_fees_eur_per_m2_month,
     estimate_monthly_rent,
+    estimate_works_cost,
     property_tax_rate,
 )
 from immo_buzz.scraper.base import RawListing
@@ -57,12 +57,6 @@ class Evaluation:
     cash_flow_monthly: float
     is_high_potential: bool
     rejection_reason: str | None = None
-
-
-def _estimate_works_cost(condition: Condition, surface: float) -> float:
-    if condition in (Condition.GOOD, Condition.REFRESH):
-        return 0.0
-    return WORKS_COST_EUR_PER_M2[condition] * surface
 
 
 def _estimate_monthly_mortgage(price: float) -> float:
@@ -109,7 +103,12 @@ def evaluate(
     )
     annual_rent = monthly_rent * 12
     notary_fees = listing.price * notary_fee_rate
-    works_cost = _estimate_works_cost(condition, surface)
+    works_cost = estimate_works_cost(
+        condition,
+        surface,
+        energy_class=listing.energy_class,
+        price=listing.price,
+    )
     total_cost = listing.price + notary_fees + works_cost
     gross_yield = annual_rent / total_cost * 100
 
