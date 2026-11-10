@@ -10,6 +10,7 @@ __pycache__/
 data/*.db
 data/*.db-journal
 data/*.db-wal
+data/*.db-shm
 
 # Environnement et Secrets
 .env

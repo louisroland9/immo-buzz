@@ -49,6 +49,7 @@ class Evaluation:
     total_cost: float
     condo_fees_annual: float
     property_tax: float
+    estimated_property_tax: float
     management_fees: float
     vacancy_cost: float
     net_annual_income: float
@@ -82,7 +83,9 @@ def evaluate(
     Total purchase cost is the asking price plus notary fees plus the works
     budget. The gross yield is the annual rent divided by that total cost;
     the net yield subtracts the operating costs (condo fees, property tax,
-    management fees and vacancy). Filtering stays based on the gross yield.
+    management fees and vacancy). The property tax uses the amount declared in
+    the listing when available, otherwise a commune-rate estimate. Filtering
+    stays based on the gross yield.
     """
     text = f"{listing.title} {listing.description or ''}"
     condition = detect_condition(text, listing.energy_class, listing.works_signalled)
@@ -115,7 +118,14 @@ def evaluate(
     condo_fees_annual = (
         condo_fees_eur_per_m2_month(listing.property_type) * surface * 12
     )
-    property_tax = listing.price * property_tax_rate(listing.city)
+    # The commune rate always yields an estimate; the amount declared in the
+    # listing, when available, takes precedence for the net yield computation.
+    estimated_property_tax = listing.price * property_tax_rate(listing.city)
+    property_tax = (
+        listing.property_tax
+        if listing.property_tax is not None
+        else estimated_property_tax
+    )
     management_fees = annual_rent * management_fee_rate
     vacancy_cost = annual_rent * vacancy_rate
     net_annual_income = (
@@ -133,6 +143,7 @@ def evaluate(
         "total_cost": total_cost,
         "condo_fees_annual": condo_fees_annual,
         "property_tax": property_tax,
+        "estimated_property_tax": estimated_property_tax,
         "management_fees": management_fees,
         "vacancy_cost": vacancy_cost,
         "net_annual_income": net_annual_income,
@@ -169,6 +180,7 @@ def _rejected(
     total_cost: float = 0.0,
     condo_fees_annual: float = 0.0,
     property_tax: float = 0.0,
+    estimated_property_tax: float = 0.0,
     management_fees: float = 0.0,
     vacancy_cost: float = 0.0,
     net_annual_income: float = 0.0,
@@ -187,6 +199,7 @@ def _rejected(
         total_cost=total_cost,
         condo_fees_annual=condo_fees_annual,
         property_tax=property_tax,
+        estimated_property_tax=estimated_property_tax,
         management_fees=management_fees,
         vacancy_cost=vacancy_cost,
         net_annual_income=net_annual_income,

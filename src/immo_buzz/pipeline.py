@@ -161,7 +161,8 @@ def build_listing_create(raw: RawListing, evaluation: Evaluation) -> ListingCrea
         total_cost=round(evaluation.total_cost, 2),
         estimated_gross_yield=round(evaluation.gross_yield_pct, 2),
         estimated_net_yield=round(evaluation.net_yield_pct, 2),
-        estimated_property_tax=round(evaluation.property_tax, 2),
+        estimated_property_tax=round(evaluation.estimated_property_tax, 2),
+        property_tax=raw.property_tax,
         estimated_condo_fees=round(evaluation.condo_fees_annual, 2),
         published_at=raw.published_at,
     )

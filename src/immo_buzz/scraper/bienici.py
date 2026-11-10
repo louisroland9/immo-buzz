@@ -10,8 +10,10 @@ isolated in this module.
 
 from __future__ import annotations
 
+import html
 import json
 import logging
+import re
 import time
 from datetime import datetime
 from typing import Any
@@ -53,6 +55,21 @@ PROPERTY_TYPE_LABELS: dict[PropertyType, str] = {
 
 # Guard rail: the API refuses requests beyond this offset.
 MAX_OFFSET = 4900
+
+# The property tax is not a structured field of the API: it is only mentioned
+# in the free text description ("Taxe fonciere : 436 EUR"). The pattern accepts
+# an optional colon, thousands separators (space, narrow no-break space, dot)
+# and a currency suffix.
+_SPACES = "\u00a0\u202f"
+_PROPERTY_TAX_PATTERN = re.compile(
+    rf"taxe[\s{_SPACES}]+fonci[eè]re\b[^\d]{{0,12}}?([0-9][0-9\s{_SPACES}.,]*)",
+    re.IGNORECASE,
+)
+_HTML_TAG = re.compile(r"<[^>]+>")
+
+# Below/above these bounds the parsed value is considered a parsing artefact.
+MIN_PLAUSIBLE_PROPERTY_TAX = 10.0
+MAX_PLAUSIBLE_PROPERTY_TAX = 100_000.0
 
 
 class BieniciSource:
@@ -189,6 +206,7 @@ class BieniciSource:
             rooms=_as_int(ad.get("roomsQuantity")),
             energy_class=_as_energy_class(ad.get("energyClassification")),
             works_signalled=_as_bool(ad.get("workToDo")),
+            property_tax=_parse_property_tax(ad.get("description")),
             published_at=_parse_datetime(ad.get("publicationDate")),
         )
 
@@ -241,6 +259,58 @@ def _as_bool(value: Any) -> bool | None:
     if value is None:
         return None
     return bool(value)
+
+
+def _parse_property_tax(description: Any) -> float | None:
+    """Extract the declared property tax from a listing description.
+
+    Bien'ici exposes no dedicated field: the amount is only written in the free
+    text (``Taxe fonciere : 436 EUR``). Returns ``None`` when the tax is not
+    mentioned, or when the parsed amount is implausible.
+    """
+    if not isinstance(description, str) or not description:
+        return None
+
+    text = _HTML_TAG.sub(" ", html.unescape(description))
+    match = _PROPERTY_TAX_PATTERN.search(text)
+    if match is None:
+        return None
+
+    value = _parse_amount(match.group(1))
+    if value is None:
+        return None
+    if not MIN_PLAUSIBLE_PROPERTY_TAX <= value <= MAX_PLAUSIBLE_PROPERTY_TAX:
+        return None
+    return round(value, 2)
+
+
+def _parse_amount(raw: str) -> float | None:
+    """Turn a human formatted amount (``1 200,50``) into a float.
+
+    Both ``1 200,50`` and ``1.200,50``/``1,200.50`` are supported: a separator
+    followed by exactly three digits is a thousands separator, otherwise it is
+    a decimal mark.
+    """
+    cleaned = raw.replace("\u00a0", "").replace("\u202f", "").replace(" ", "").strip()
+    # A trailing separator followed by one or two digits is a decimal mark.
+    decimal_separator: str | None = None
+    for separator in (",", "."):
+        if re.search(rf"\{separator}\d{{1,2}}$", cleaned):
+            decimal_separator = separator
+            break
+
+    if decimal_separator is not None:
+        integer_part = cleaned[: cleaned.rfind(decimal_separator)].replace(",", "")
+        integer_part = integer_part.replace(".", "")
+        fraction = cleaned[cleaned.rfind(decimal_separator) + 1 :]
+        cleaned = f"{integer_part}.{fraction}"
+    else:
+        cleaned = cleaned.replace(",", "").replace(".", "")
+
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
 
 
 def _parse_datetime(value: Any) -> datetime | None:

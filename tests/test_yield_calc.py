@@ -66,6 +66,7 @@ def test_evaluation_math_is_consistent() -> None:
     # Condo fees 1.8 EUR/m2/month for a flat, Lille property tax 0.80%.
     assert result.condo_fees_annual == pytest.approx(1.8 * 50 * 12)
     assert result.property_tax == pytest.approx(120_000 * 0.0080)
+    assert result.estimated_property_tax == pytest.approx(120_000 * 0.0080)
     assert result.management_fees == pytest.approx(725 * 12 * 0.07)
     assert result.vacancy_cost == pytest.approx(725 * 12 * 0.04)
     assert result.net_yield_pct < result.gross_yield_pct
@@ -83,6 +84,21 @@ def test_house_has_no_condominium_fees() -> None:
     assert result.condo_fees_annual == 0.0
     assert result.property_tax > 0
     assert result.net_yield_pct < result.gross_yield_pct
+
+
+def test_declared_property_tax_overrides_the_estimate() -> None:
+    listing = make_listing(price=120_000.0, surface=50.0, property_tax=436.0)
+    result = evaluate(listing)
+    # The declared amount is used as is, the estimate stays available.
+    assert result.property_tax == pytest.approx(436.0)
+    assert result.estimated_property_tax == pytest.approx(120_000 * 0.0080)
+
+
+def test_property_tax_falls_back_to_the_estimate_when_absent() -> None:
+    listing = make_listing(price=120_000.0, surface=50.0, property_tax=None)
+    result = evaluate(listing)
+    assert result.property_tax == pytest.approx(120_000 * 0.0080)
+    assert result.estimated_property_tax == pytest.approx(120_000 * 0.0080)
 
 
 def test_parking_has_no_condominium_fees_and_tax_applies() -> None:
