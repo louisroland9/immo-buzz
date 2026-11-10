@@ -46,7 +46,11 @@ class ListingBase(SQLModel):
     total_cost: float | None = None
     estimated_gross_yield: float | None = Field(default=None, index=True)
     estimated_net_yield: float | None = Field(default=None, index=True)
+    # ``estimated_property_tax`` is always derived from the commune rate, while
+    # ``property_tax`` holds the amount declared in the listing (``None`` when
+    # the source does not mention it).
     estimated_property_tax: float | None = None
+    property_tax: float | None = None
     estimated_condo_fees: float | None = None
 
     published_at: datetime | None = None
