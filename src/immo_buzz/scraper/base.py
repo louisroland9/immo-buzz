@@ -31,6 +31,8 @@ class RawListing(BaseModel):
     rooms: int | None = None
     energy_class: str | None = None
     works_signalled: bool | None = None
+    # Property tax declared in the listing text, when mentioned by the source.
+    property_tax: float | None = None
     published_at: datetime | None = None
 
 
