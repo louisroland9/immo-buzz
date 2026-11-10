@@ -59,6 +59,7 @@ def test_evaluation_math_is_consistent() -> None:
     assert result.condition is Condition.GOOD
     # Lille flat 50 m2 -> tier 2, 14.5 EUR/m2.
     assert result.monthly_rent == pytest.approx(725.0)
+    assert result.estimated_monthly_rent == pytest.approx(725.0)
     assert result.notary_fees == pytest.approx(9_600.0)
     assert result.works_cost == 0.0
     assert result.total_cost == pytest.approx(129_600.0)
@@ -99,6 +100,22 @@ def test_property_tax_falls_back_to_the_estimate_when_absent() -> None:
     result = evaluate(listing)
     assert result.property_tax == pytest.approx(120_000 * 0.0080)
     assert result.estimated_property_tax == pytest.approx(120_000 * 0.0080)
+
+
+def test_declared_monthly_rent_overrides_the_estimate() -> None:
+    listing = make_listing(price=120_000.0, surface=50.0, monthly_rent=712.0)
+    result = evaluate(listing)
+    # The declared rent is used as is, the estimate stays available.
+    assert result.monthly_rent == pytest.approx(712.0)
+    assert result.annual_rent == pytest.approx(712.0 * 12)
+    assert result.estimated_monthly_rent == pytest.approx(725.0)
+
+
+def test_monthly_rent_falls_back_to_the_estimate_when_absent() -> None:
+    listing = make_listing(price=120_000.0, surface=50.0, monthly_rent=None)
+    result = evaluate(listing)
+    assert result.monthly_rent == pytest.approx(725.0)
+    assert result.estimated_monthly_rent == pytest.approx(725.0)
 
 
 def test_parking_has_no_condominium_fees_and_tax_applies() -> None:

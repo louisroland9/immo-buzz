@@ -13,6 +13,7 @@ from immo_buzz.scraper.bienici import (
     AD_API_URL,
     API_URL,
     BieniciSource,
+    _parse_monthly_rent,
     _parse_property_tax,
 )
 
@@ -78,12 +79,14 @@ def test_fetch_maps_listings_and_skips_unknown_types(
     assert flat.title == "Appartement T2 47 m2 Lille"
     assert flat.published_at is not None
     assert flat.property_tax == 720.0
+    assert flat.monthly_rent == 712.0
 
     parking = listings[2]
     assert parking.property_type is PropertyType.PARKING
     assert parking.surface is None
     assert parking.energy_class is None
     assert parking.property_tax is None
+    assert parking.monthly_rent is None
 
 
 def test_fetch_maps_work_to_do_and_energy_class(
@@ -210,3 +213,37 @@ def test_parse_property_tax_returns_none_when_absent_or_implausible(
     description: str | None,
 ) -> None:
     assert _parse_property_tax(description) is None
+
+
+@pytest.mark.parametrize(
+    ("description", "expected"),
+    [
+        ("Loyer : 712€.", 712.0),
+        ("Loyer : 712 €.", 712.0),
+        ("Loyer actuel : 1 200 €.", 1200.0),
+        ("loyers mensuels : 890,50 euros", 890.5),
+        ("SPECIAL INVESTISSEUR<br>Loyer : 712€ (date du bail 13/06/2013).", 712.0),
+        ("Loyer hors charges : 950 €", 950.0),
+        ("Loyer charges comprises : 1.050 €", 1050.0),
+    ],
+)
+def test_parse_monthly_rent_reads_the_declared_amount(
+    description: str, expected: float
+) -> None:
+    assert _parse_monthly_rent(description) == expected
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        None,
+        "",
+        "Bel appartement sans mention de loyer.",
+        "Loyer : 5 €",  # implausible low
+        "Loyer : 50 000 €",  # implausible high
+    ],
+)
+def test_parse_monthly_rent_returns_none_when_absent_or_implausible(
+    description: str | None,
+) -> None:
+    assert _parse_monthly_rent(description) is None
