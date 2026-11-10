@@ -98,3 +98,25 @@ def test_listing_text_signal_columns_are_added(
 
     columns = {column["name"] for column in inspect(engine).get_columns("listing")}
     assert {"description", "energy_class", "works_signalled"} <= columns
+
+
+def test_declared_property_tax_column_is_added(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    database_path = tmp_path / "legacy_tax.db"
+    database_url = f"sqlite:///{database_path}"
+    engine = create_engine(database_url)
+    with engine.begin() as connection:
+        connection.execute(
+            text("CREATE TABLE listing (id INTEGER PRIMARY KEY, url VARCHAR NOT NULL)")
+        )
+
+    monkeypatch.setenv("IMMO_DATABASE_URL", database_url)
+    project_root = Path(__file__).resolve().parents[1]
+    config = Config(str(project_root / "alembic.ini"))
+    config.set_main_option("script_location", str(project_root / "migrations"))
+
+    command.upgrade(config, "head")
+
+    columns = {column["name"] for column in inspect(engine).get_columns("listing")}
+    assert {"property_tax", "estimated_property_tax"} <= columns

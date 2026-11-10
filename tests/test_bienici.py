@@ -9,7 +9,12 @@ import httpx
 import pytest
 
 from immo_buzz.db.models import PropertyType
-from immo_buzz.scraper.bienici import AD_API_URL, API_URL, BieniciSource
+from immo_buzz.scraper.bienici import (
+    AD_API_URL,
+    API_URL,
+    BieniciSource,
+    _parse_property_tax,
+)
 
 
 class StubResponse:
@@ -72,11 +77,13 @@ def test_fetch_maps_listings_and_skips_unknown_types(
     assert flat.url == "https://www.bienici.com/annonce/era-1565943"
     assert flat.title == "Appartement T2 47 m2 Lille"
     assert flat.published_at is not None
+    assert flat.property_tax == 720.0
 
     parking = listings[2]
     assert parking.property_type is PropertyType.PARKING
     assert parking.surface is None
     assert parking.energy_class is None
+    assert parking.property_tax is None
 
 
 def test_fetch_maps_work_to_do_and_energy_class(
@@ -159,3 +166,47 @@ def test_offset_guard_rail_stops_requests(bienici_payload: dict[str, Any]) -> No
 def test_empty_zone_list_is_rejected() -> None:
     with pytest.raises(ValueError):
         BieniciSource([])
+
+
+@pytest.mark.parametrize(
+    ("description", "expected"),
+    [
+        ("Taxe fonciere : 436 EUR.", 436.0),
+        ("Taxe foncière: 1 200 €.", 1200.0),
+        ("taxe fonciere de 1.200 €", 1200.0),
+        ("Taxe fonciere 890,50 euros", 890.5),
+        (
+            "Taxe"
+            + chr(0xA0)
+            + "foncière"
+            + chr(0xA0)
+            + ":"
+            + chr(0xA0)
+            + "436"
+            + chr(0xA0)
+            + "€",
+            436.0,
+        ),
+        ("DPE : C.<br>Taxe fonciere : 720 EUR.<br>Chauffage gaz.", 720.0),
+    ],
+)
+def test_parse_property_tax_reads_the_declared_amount(
+    description: str, expected: float
+) -> None:
+    assert _parse_property_tax(description) == expected
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        None,
+        "",
+        "Bel appartement sans mention fiscale.",
+        "Taxe fonciere : 5 EUR",  # implausible low
+        "Taxe fonciere : 999 999 EUR",  # implausible high
+    ],
+)
+def test_parse_property_tax_returns_none_when_absent_or_implausible(
+    description: str | None,
+) -> None:
+    assert _parse_property_tax(description) is None

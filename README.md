@@ -33,7 +33,7 @@ uv run immo-buzz --commune Lille --commune Roubaix
 prix_total   = prix + 8% de frais de notaire + travaux
                travaux = coût_fixe(état) + coût_m²(état) × surface + prime DPE F/G
 loyer_brut   = loyer_mensuel_estimé * 12
-charges      = copro (€/m²/mois) + taxe_foncière (% du prix) + gestion (7% loyer) + vacance (4% loyer)
+charges      = copro (€/m²/mois) + taxe_foncière + gestion (7% loyer) + vacance (4% loyer)
 loyer_net    = loyer_brut - charges
 rendement_brut = loyer_brut / prix_total * 100
 rendement_net  = loyer_net  / prix_total * 100
@@ -51,9 +51,12 @@ rendement_net  = loyer_net  / prix_total * 100
   rénovation, puis est borné (plafond au m² et ratio maximal du prix). Les
   ordres de grandeur s'inspirent des guides FNAIM/ANIL (constantes éditables
   dans `src/immo_buzz/engine/grids.py`).
-- La **taxe foncière** est estimée comme un taux effectif appliqué au prix
-  d'acquisition, par commune (DGFiP, simplification de la valeur locative
-  cadastrale).
+- La **taxe foncière** est récupérée du texte de l'annonce quand elle est
+  mentionnée (colonne `property_tax`, sinon `NULL`), et sert en priorité au
+  calcul du rendement net. En complément, une valeur **estimée**
+  (`estimated_property_tax`) est toujours calculée comme un taux effectif
+  appliqué au prix d'acquisition, par commune (DGFiP, simplification de la
+  valeur locative cadastrale).
 - Les **charges de copropriété** non récupérables (`1,8 €/m²/mois`) ne
   s'appliquent qu'aux appartements et immeubles.
 - Un bien est conservé si **rendement brut** `>= 8%` (réglable via `--min-yield`
