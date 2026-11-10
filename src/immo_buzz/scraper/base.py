@@ -33,6 +33,8 @@ class RawListing(BaseModel):
     works_signalled: bool | None = None
     # Property tax declared in the listing text, when mentioned by the source.
     property_tax: float | None = None
+    # Current monthly rent declared in the listing text, when mentioned.
+    monthly_rent: float | None = None
     published_at: datetime | None = None
 
 

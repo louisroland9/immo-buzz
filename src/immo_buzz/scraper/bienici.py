@@ -65,11 +65,21 @@ _PROPERTY_TAX_PATTERN = re.compile(
     rf"taxe[\s{_SPACES}]+fonci[eè]re\b[^\d]{{0,12}}?([0-9][0-9\s{_SPACES}.,]*)",
     re.IGNORECASE,
 )
+# The current rent is likewise only written in the free text ("Loyer : 712 EUR",
+# "loyers actuels : 900 EUR"). The optional words cover the usual phrasings.
+_RENT_PATTERN = re.compile(
+    rf"loyers?[\s{_SPACES}]+(?:actuel[s]?|mensuel[s]?|net[s]?|hc|cc|hors[\s{_SPACES}]+charges|"
+    rf"charges[\s{_SPACES}]+comprises)?[\s{_SPACES}]*:?[\s{_SPACES}]*"
+    rf"([0-9][0-9\s{_SPACES}.,]*)",
+    re.IGNORECASE,
+)
 _HTML_TAG = re.compile(r"<[^>]+>")
 
 # Below/above these bounds the parsed value is considered a parsing artefact.
 MIN_PLAUSIBLE_PROPERTY_TAX = 10.0
 MAX_PLAUSIBLE_PROPERTY_TAX = 100_000.0
+MIN_PLAUSIBLE_MONTHLY_RENT = 50.0
+MAX_PLAUSIBLE_MONTHLY_RENT = 10_000.0
 
 
 class BieniciSource:
@@ -207,6 +217,7 @@ class BieniciSource:
             energy_class=_as_energy_class(ad.get("energyClassification")),
             works_signalled=_as_bool(ad.get("workToDo")),
             property_tax=_parse_property_tax(ad.get("description")),
+            monthly_rent=_parse_monthly_rent(ad.get("description")),
             published_at=_parse_datetime(ad.get("publicationDate")),
         )
 
@@ -280,6 +291,29 @@ def _parse_property_tax(description: Any) -> float | None:
     if value is None:
         return None
     if not MIN_PLAUSIBLE_PROPERTY_TAX <= value <= MAX_PLAUSIBLE_PROPERTY_TAX:
+        return None
+    return round(value, 2)
+
+
+def _parse_monthly_rent(description: Any) -> float | None:
+    """Extract the declared current monthly rent from a listing description.
+
+    Bien'ici exposes no dedicated field: the rent is only written in the free
+    text (``Loyer : 712 EUR``). Returns ``None`` when it is not mentioned, or
+    when the parsed amount is implausible.
+    """
+    if not isinstance(description, str) or not description:
+        return None
+
+    text = _HTML_TAG.sub(" ", html.unescape(description))
+    match = _RENT_PATTERN.search(text)
+    if match is None:
+        return None
+
+    value = _parse_amount(match.group(1))
+    if value is None:
+        return None
+    if not MIN_PLAUSIBLE_MONTHLY_RENT <= value <= MAX_PLAUSIBLE_MONTHLY_RENT:
         return None
     return round(value, 2)
 
