@@ -9,6 +9,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, fields
 
+from dotenv import find_dotenv, load_dotenv
+
 # --- Database ------------------------------------------------------------
 DEFAULT_DATABASE_URL = "sqlite:///data/app.db"
 
@@ -77,7 +79,13 @@ def _env(name: str, default: str) -> str:
 
 
 def load_settings() -> Settings:
-    """Build a :class:`Settings` instance from ``IMMO_*`` environment vars."""
+    """Build a :class:`Settings` instance from ``IMMO_*`` environment vars.
+
+    A local ``.env`` file is loaded first, so the scraper can be configured
+    without exporting variables in the shell. Real environment variables always
+    take precedence over the ``.env`` values.
+    """
+    load_dotenv(find_dotenv(usecwd=True), override=False)
     values: dict[str, object] = {
         "database_url": _env("DATABASE_URL", DEFAULT_DATABASE_URL),
         "min_yield_pct": float(_env("MIN_YIELD_PCT", str(DEFAULT_MIN_YIELD_PCT))),

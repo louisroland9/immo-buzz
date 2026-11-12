@@ -28,7 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-pages",
         type=int,
         default=None,
-        help="number of pages fetched per source (default: IMMO_MAX_PAGES or 5)",
+        help="pages fetched per search area (default: IMMO_MAX_PAGES or 5)",
     )
     parser.add_argument(
         "--commune",

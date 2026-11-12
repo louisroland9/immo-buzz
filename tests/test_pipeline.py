@@ -31,6 +31,18 @@ class StubSource:
             return []
         return self._pages[page]
 
+    def iter_listings(self, *, max_pages: int, page_size: int) -> list[RawListing]:
+        """Walk the stubbed pages once and drop the listings already seen."""
+        seen: set[str] = set()
+        collected: list[RawListing] = []
+        for page in range(max_pages):
+            for raw in self.fetch(page=page, page_size=page_size):
+                if raw.source_id in seen:
+                    continue
+                seen.add(raw.source_id)
+                collected.append(raw)
+        return collected
+
 
 class AvailabilityStubSource(StubSource):
     """Stub source exposing the optional availability checker capability."""

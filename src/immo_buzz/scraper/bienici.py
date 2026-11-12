@@ -54,7 +54,7 @@ PROPERTY_TYPE_LABELS: dict[PropertyType, str] = {
 }
 
 # Guard rail: the API refuses requests beyond this offset.
-MAX_OFFSET = 4900
+MAX_OFFSET = 2400
 
 # The property tax is not a structured field of the API: it is only mentioned
 # in the free text description ("Taxe fonciere : 436 EUR"). The pattern accepts
@@ -118,23 +118,25 @@ class BieniciSource:
     def close(self) -> None:
         self._client.close()
 
-    def _build_filters(self, page: int, page_size: int) -> str:
+    def _build_filters(
+        self, page: int, page_size: int, zone_ids: list[str] | None = None
+    ) -> str:
         payload = {
             "size": min(page_size, DEFAULT_PAGE_SIZE),
             "from": max(page, 0) * page_size,
             "filterType": "buy",
             "propertyType": [pt.value for pt in self._property_types],
-            "zoneIdsByTypes": {"zoneIds": list(self._zone_ids)},
+            "zoneIdsByTypes": {"zoneIds": list(zone_ids or self._zone_ids)},
             "sortBy": "publicationDate",
             "sortOrder": "desc",
             "onTheMarket": [True],
         }
         return json.dumps(payload, separators=(",", ":"))
 
-    def fetch(
-        self, *, page: int = 0, page_size: int = DEFAULT_PAGE_SIZE
+    def _fetch_page(
+        self, *, page: int, page_size: int, zone_ids: list[str]
     ) -> list[RawListing]:
-        """Return the raw listings of a single page."""
+        """Fetch a single page restricted to an explicit list of zones."""
         offset = max(page, 0) * page_size
         if offset > MAX_OFFSET:
             logger.info("bienici: offset %s beyond guard rail, stopping", offset)
@@ -142,7 +144,7 @@ class BieniciSource:
 
         response = self._client.get(
             API_URL,
-            params={"filters": self._build_filters(page, page_size)},
+            params={"filters": self._build_filters(page, page_size, zone_ids)},
         )
         response.raise_for_status()
         payload: dict[str, Any] = response.json()
@@ -152,6 +154,36 @@ class BieniciSource:
             time.sleep(self._delay)
 
         return [listing for ad in ads if (listing := self._map_ad(ad)) is not None]
+
+    def fetch(
+        self, *, page: int = 0, page_size: int = DEFAULT_PAGE_SIZE
+    ) -> list[RawListing]:
+        """Return the raw listings of a single global page (all zones at once)."""
+        return self._fetch_page(page=page, page_size=page_size, zone_ids=self._zone_ids)
+
+    def iter_listings(self, *, max_pages: int, page_size: int) -> list[RawListing]:
+        """Walk every zone independently and deduplicate the listings.
+
+        The search endpoint paginates globally: querying all zones at once
+        shares a single offset window across them, so recent ads from the
+        busiest communes hide the rest. Querying one zone at a time gives each
+        commune its own pagination window and greatly improves coverage.
+        """
+        seen: set[str] = set()
+        collected: list[RawListing] = []
+        for zone_id in self._zone_ids:
+            for page in range(max_pages):
+                batch = self._fetch_page(
+                    page=page, page_size=page_size, zone_ids=[zone_id]
+                )
+                if not batch:
+                    break
+                for raw in batch:
+                    if raw.source_id in seen:
+                        continue
+                    seen.add(raw.source_id)
+                    collected.append(raw)
+        return collected
 
     def is_available(self, source_id: str) -> bool | None:
         """Check whether an ad still exists on Bien'ici.

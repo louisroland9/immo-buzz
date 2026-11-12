@@ -171,6 +171,82 @@ def test_empty_zone_list_is_rejected() -> None:
         BieniciSource([])
 
 
+class ZoneAwareClient:
+    """Client returning one ad per zone, keyed by the requested zone id."""
+
+    def __init__(self, ads_by_zone: dict[str, list[dict[str, Any]]]) -> None:
+        self._ads_by_zone = ads_by_zone
+        self.calls: list[dict[str, Any]] = []
+
+    def get(self, url: str, params: dict[str, Any] | None = None) -> StubResponse:
+        del url
+        filters = json.loads((params or {})["filters"])
+        self.calls.append(filters)
+        zone_ids = filters["zoneIdsByTypes"]["zoneIds"]
+        ads: list[dict[str, Any]] = []
+        for zone_id in zone_ids:
+            ads.extend(self._ads_by_zone.get(zone_id, []))
+        return StubResponse({"realEstateAds": ads})
+
+    def close(self) -> None:
+        return None
+
+
+def _ad(source_id: str, zone: str) -> dict[str, Any]:
+    return {
+        "id": source_id,
+        "propertyType": "flat",
+        "price": 100_000,
+        "surfaceArea": 50,
+        "city": zone,
+        "postalCode": "59000",
+        "description": "",
+    }
+
+
+def test_iter_listings_queries_one_zone_per_request() -> None:
+    client = ZoneAwareClient(
+        {"-58404": [_ad("a", "Lille")], "-59043": [_ad("b", "Roubaix")]}
+    )
+    source = BieniciSource(["-58404", "-59043"], client=client, request_delay_s=0.0)  # type: ignore[arg-type]
+
+    listings = source.iter_listings(max_pages=1, page_size=100)
+
+    assert [listing.source_id for listing in listings] == ["a", "b"]
+    # One request per zone, each carrying a single zone id.
+    assert len(client.calls) == 2
+    assert client.calls[0]["zoneIdsByTypes"] == {"zoneIds": ["-58404"]}
+    assert client.calls[1]["zoneIdsByTypes"] == {"zoneIds": ["-59043"]}
+
+
+def test_iter_listings_deduplicates_across_zones() -> None:
+    shared = _ad("dup", "Lille")
+    client = ZoneAwareClient(
+        {"-58404": [shared, _ad("a", "Lille")], "-59043": [shared, _ad("b", "Roubaix")]}
+    )
+    source = BieniciSource(["-58404", "-59043"], client=client, request_delay_s=0.0)  # type: ignore[arg-type]
+
+    listings = source.iter_listings(max_pages=1, page_size=100)
+
+    assert [listing.source_id for listing in listings] == ["dup", "a", "b"]
+
+
+def test_iter_listings_paginates_each_zone_independently() -> None:
+    client = ZoneAwareClient(
+        {"-58404": [_ad("a", "Lille")], "-59043": [_ad("b", "Roubaix")]}
+    )
+    source = BieniciSource(["-58404", "-59043"], client=client, request_delay_s=0.0)  # type: ignore[arg-type]
+
+    listings = source.iter_listings(max_pages=3, page_size=100)
+
+    # Each zone is walked for up to max_pages before moving to the next one.
+    assert len(listings) == 2
+    assert client.calls[0]["zoneIdsByTypes"] == {"zoneIds": ["-58404"]}
+    assert client.calls[1]["zoneIdsByTypes"] == {"zoneIds": ["-58404"]}
+    assert client.calls[2]["zoneIdsByTypes"] == {"zoneIds": ["-58404"]}
+    assert client.calls[3]["zoneIdsByTypes"] == {"zoneIds": ["-59043"]}
+
+
 @pytest.mark.parametrize(
     ("description", "expected"),
     [

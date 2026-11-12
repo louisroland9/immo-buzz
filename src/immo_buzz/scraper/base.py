@@ -50,6 +50,17 @@ class ListingSource(Protocol):
         """Return raw listings for the given page."""
         ...
 
+    def iter_listings(
+        self, *, max_pages: int, page_size: int
+    ) -> list[RawListing]:  # pragma: no cover - protocol definition
+        """Return the listings collected across the source search areas.
+
+        Unlike :meth:`fetch`, which returns a single global page, this method
+        walks every search area independently so the pagination window applies
+        per area instead of being shared across all of them.
+        """
+        ...
+
 
 @runtime_checkable
 class ListingAvailabilityChecker(Protocol):
