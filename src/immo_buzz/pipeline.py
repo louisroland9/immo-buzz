@@ -102,6 +102,8 @@ class Pipeline:
                 raw,
                 min_yield_pct=self.settings.min_yield_pct,
                 max_yield_pct=self.settings.max_yield_pct,
+                min_plausible_price=self.settings.min_plausible_price,
+                min_price_per_m2=self.settings.min_price_per_m2,
                 notary_fee_rate=self.settings.notary_fee_rate,
                 management_fee_rate=self.settings.management_fee_rate,
                 vacancy_rate=self.settings.vacancy_rate,

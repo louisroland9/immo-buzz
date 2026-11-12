@@ -1,5 +1,6 @@
 """Financial engine: rent grids, works estimation and yield filtering."""
 
+from immo_buzz.engine.exclusion import detect_exclusion
 from immo_buzz.engine.grids import (
     COMMUNE_RENT_GRID,
     CONDITION_LABELS,
@@ -42,6 +43,7 @@ __all__ = [
     "Evaluation",
     "condo_fees_eur_per_m2_month",
     "default_rent_per_m2",
+    "detect_exclusion",
     "estimate_monthly_rent",
     "estimate_works_cost",
     "evaluate",

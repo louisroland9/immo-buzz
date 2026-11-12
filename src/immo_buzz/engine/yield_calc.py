@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from immo_buzz.config import (
     DEFAULT_MANAGEMENT_FEE_RATE,
     DEFAULT_MAX_YIELD_PCT,
+    DEFAULT_MIN_PLAUSIBLE_PRICE,
+    DEFAULT_MIN_PRICE_PER_M2,
     DEFAULT_MIN_YIELD_PCT,
     DEFAULT_MORTGAGE_ANNUAL_RATE,
     DEFAULT_NOTARY_FEE_RATE,
@@ -14,6 +16,7 @@ from immo_buzz.config import (
 )
 from immo_buzz.db.models import PropertyType
 from immo_buzz.engine.condition import detect_condition
+from immo_buzz.engine.exclusion import detect_exclusion
 from immo_buzz.engine.grids import (
     CONDITION_LABELS,
     CONDITION_RENT_FACTOR,
@@ -75,6 +78,8 @@ def evaluate(
     *,
     min_yield_pct: float = DEFAULT_MIN_YIELD_PCT,
     max_yield_pct: float = DEFAULT_MAX_YIELD_PCT,
+    min_plausible_price: float = DEFAULT_MIN_PLAUSIBLE_PRICE,
+    min_price_per_m2: float = DEFAULT_MIN_PRICE_PER_M2,
     notary_fee_rate: float = DEFAULT_NOTARY_FEE_RATE,
     management_fee_rate: float = DEFAULT_MANAGEMENT_FEE_RATE,
     vacancy_rate: float = DEFAULT_VACANCY_RATE,
@@ -87,11 +92,17 @@ def evaluate(
     management fees and vacancy). The property tax uses the amount declared in
     the listing when available, otherwise a commune-rate estimate. The monthly
     rent uses the current rent declared in the listing when available,
-    otherwise a grid estimate. Filtering stays based on the gross yield.
+    otherwise a grid estimate. Filtering stays based on the gross yield, after
+    rejecting fake high yields: viager / split ownership sales and implausible
+    prices (below a floor, or below a floor per square metre).
     """
     text = f"{listing.title} {listing.description or ''}"
     condition = detect_condition(text, listing.energy_class, listing.works_signalled)
     factor = CONDITION_RENT_FACTOR[condition]
+
+    exclusion = detect_exclusion(text)
+    if exclusion is not None:
+        return _rejected(listing, condition, exclusion)
 
     if listing.property_type is PropertyType.PARKING:
         surface = 0.0
@@ -102,6 +113,25 @@ def evaluate(
 
     if listing.price <= 0:
         return _rejected(listing, condition, "prix manquant ou nul")
+
+    if listing.price < min_plausible_price:
+        return _rejected(
+            listing,
+            condition,
+            f"prix trop bas ({listing.price:.0f} EUR) - erreur de prix probable",
+        )
+
+    if (
+        listing.property_type is not PropertyType.PARKING
+        and surface > 0
+        and listing.price / surface < min_price_per_m2
+    ):
+        return _rejected(
+            listing,
+            condition,
+            f"prix au m2 trop bas ({listing.price / surface:.0f} EUR/m2) - "
+            "erreur de prix probable",
+        )
 
     # The rent grid always yields an estimate; the current rent declared in the
     # listing, when available, takes precedence for the yield computation.

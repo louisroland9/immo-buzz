@@ -23,6 +23,15 @@ DEFAULT_MIN_YIELD_PCT = 8.0
 # parking bundle, mistyped surface...), so the listing is rejected.
 DEFAULT_MAX_YIELD_PCT = 40.0
 
+# A listing whose asking price is below this floor is a price error (one euro
+# ads, "prix indicatif"...), so the listing is rejected.
+DEFAULT_MIN_PLAUSIBLE_PRICE = 5_000.0
+
+# A dwelling whose price per square metre falls below this floor is a price
+# error (mistyped surface or price), so the listing is rejected. Parkings have
+# no reliable surface and are exempted from this check.
+DEFAULT_MIN_PRICE_PER_M2 = 150.0
+
 # --- Operating costs (used to derive the net yield) ----------------------
 # Condominium fees (non recoverable), property tax rate and management fees
 # are defined per commune in ``engine/grids.py``. The settings below tune the
@@ -52,6 +61,8 @@ class Settings:
     database_url: str = DEFAULT_DATABASE_URL
     min_yield_pct: float = DEFAULT_MIN_YIELD_PCT
     max_yield_pct: float = DEFAULT_MAX_YIELD_PCT
+    min_plausible_price: float = DEFAULT_MIN_PLAUSIBLE_PRICE
+    min_price_per_m2: float = DEFAULT_MIN_PRICE_PER_M2
     notary_fee_rate: float = DEFAULT_NOTARY_FEE_RATE
     management_fee_rate: float = DEFAULT_MANAGEMENT_FEE_RATE
     vacancy_rate: float = DEFAULT_VACANCY_RATE
@@ -71,6 +82,12 @@ def load_settings() -> Settings:
         "database_url": _env("DATABASE_URL", DEFAULT_DATABASE_URL),
         "min_yield_pct": float(_env("MIN_YIELD_PCT", str(DEFAULT_MIN_YIELD_PCT))),
         "max_yield_pct": float(_env("MAX_YIELD_PCT", str(DEFAULT_MAX_YIELD_PCT))),
+        "min_plausible_price": float(
+            _env("MIN_PLAUSIBLE_PRICE", str(DEFAULT_MIN_PLAUSIBLE_PRICE))
+        ),
+        "min_price_per_m2": float(
+            _env("MIN_PRICE_PER_M2", str(DEFAULT_MIN_PRICE_PER_M2))
+        ),
         "notary_fee_rate": float(_env("NOTARY_FEE_RATE", str(DEFAULT_NOTARY_FEE_RATE))),
         "management_fee_rate": float(
             _env("MANAGEMENT_FEE_RATE", str(DEFAULT_MANAGEMENT_FEE_RATE))

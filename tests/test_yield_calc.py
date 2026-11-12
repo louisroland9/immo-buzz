@@ -240,6 +240,17 @@ def test_price_of_one_euro_is_rejected_as_suspicious() -> None:
     result = evaluate(listing, max_yield_pct=20.0)
     assert result.is_high_potential is False
     assert result.rejection_reason is not None
+    assert "prix trop bas" in result.rejection_reason
+
+
+def test_implausible_yield_is_rejected() -> None:
+    # A price below the floor would be caught earlier, so the max yield guard
+    # is exercised with a plausible price, a disabled price floor and a very
+    # high rent per square metre to push the gross yield above the ceiling.
+    listing = make_listing(price=5_000.0, surface=8.0, monthly_rent=3_000.0)
+    result = evaluate(listing, max_yield_pct=20.0, min_plausible_price=0.0)
+    assert result.is_high_potential is False
+    assert result.rejection_reason is not None
     assert "invraisemblable" in result.rejection_reason
 
 
@@ -269,3 +280,68 @@ def test_parking_is_accepted_without_surface() -> None:
     assert result.gross_yield_pct == pytest.approx(70 * 12 / (9_000 * 1.08) * 100)
     assert result.is_high_potential is True
     assert result.monthly_rent == pytest.approx(70.0)
+
+
+def test_viager_listing_is_rejected() -> None:
+    listing = make_listing(
+        title="Appartement en viager occupe",
+        description="Vente en viager, bouquet 50 000 EUR.",
+        price=60_000.0,
+        surface=25.0,
+    )
+    result = evaluate(listing)
+    assert result.is_high_potential is False
+    assert result.rejection_reason is not None
+    assert "viager" in result.rejection_reason
+
+
+def test_bare_ownership_listing_is_rejected() -> None:
+    listing = make_listing(
+        title="Appartement en nue propriete",
+        price=60_000.0,
+        surface=25.0,
+    )
+    result = evaluate(listing)
+    assert result.is_high_potential is False
+    assert result.rejection_reason is not None
+    assert "demembrement" in result.rejection_reason
+
+
+def test_low_price_is_rejected() -> None:
+    listing = make_listing(price=3_000.0, surface=50.0)
+    result = evaluate(listing, min_plausible_price=5_000.0)
+    assert result.is_high_potential is False
+    assert result.rejection_reason is not None
+    assert "prix trop bas" in result.rejection_reason
+
+
+def test_low_price_per_m2_is_rejected() -> None:
+    # 60 000 EUR for 500 m2 -> 120 EUR/m2, below the floor.
+    listing = make_listing(price=60_000.0, surface=500.0)
+    result = evaluate(listing, min_price_per_m2=150.0)
+    assert result.is_high_potential is False
+    assert result.rejection_reason is not None
+    assert "prix au m2" in result.rejection_reason
+
+
+def test_price_per_m2_floor_does_not_apply_to_parkings() -> None:
+    listing = make_listing(
+        property_type=PropertyType.PARKING,
+        title="Place de parking",
+        price=9_000.0,
+        surface=None,
+    )
+    result = evaluate(listing, min_price_per_m2=150.0)
+    assert result.rejection_reason is None
+
+
+def test_heavy_renovation_is_still_accepted() -> None:
+    listing = make_listing(
+        title="Immeuble a restaurer",
+        property_type=PropertyType.BUILDING,
+        price=200_000.0,
+        surface=300.0,
+    )
+    result = evaluate(listing, min_price_per_m2=150.0)
+    assert result.condition is Condition.HEAVY
+    assert result.rejection_reason is None
