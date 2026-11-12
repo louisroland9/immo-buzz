@@ -106,7 +106,7 @@ Variables d'environnement (préfixe `IMMO_`) :
 | `IMMO_VACANCY_RATE` | `0.04` | provision vacance locative (part du loyer) |
 | `IMMO_MORTGAGE_ANNUAL_RATE` | `0.035` | taux annuel pour l'estimation de cash-flow |
 | `IMMO_REQUEST_DELAY_S` | `1.0` | délai entre deux requêtes |
-| `IMMO_MAX_PAGES` | `5` | pages par commune |
+| `IMMO_MAX_PAGES` | `24` | pages par commune |
 | `IMMO_PAGE_SIZE` | `100` | annonces par page (max 100) |
 
 ## Développement
