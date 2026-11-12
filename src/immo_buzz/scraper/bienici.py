@@ -54,7 +54,7 @@ PROPERTY_TYPE_LABELS: dict[PropertyType, str] = {
 }
 
 # Guard rail: the API refuses requests beyond this offset.
-MAX_OFFSET = 4900
+MAX_OFFSET = 2400
 
 # The property tax is not a structured field of the API: it is only mentioned
 # in the free text description ("Taxe fonciere : 436 EUR"). The pattern accepts
