@@ -20,12 +20,17 @@ uv run alembic upgrade head
 # Analyse complète, sans écriture en base
 uv run immo-buzz --dry-run
 
-# 1 page par zone, seuil abaissé à 7%
+# 1 page par commune, seuil abaissé à 7%
 uv run immo-buzz --max-pages 1 --min-yield 7
 
 # Limiter la recherche à deux communes
 uv run immo-buzz --commune Lille --commune Roubaix
 ```
+
+La pagination s'applique **commune par commune** : `--max-pages` est le nombre
+de pages parcourues *par zone de recherche*, et non un budget global. Chaque
+commune dispose donc de sa propre fenêtre d'annonces, ce qui évite qu'une
+commune très active (Lille) masque les autres par son flux récent.
 
 ## Calcul du rendement
 
@@ -83,19 +88,25 @@ FastAPI et Streamlit peuvent la réutiliser directement.
 
 ## Configuration
 
+Les variables sont lues depuis l'environnement, et un fichier **`.env`** à la
+racine est chargé automatiquement (copiez `.env.example` vers `.env`). Les
+variables réellement présentes dans l'environnement ont priorité sur `.env`.
+
 Variables d'environnement (préfixe `IMMO_`) :
 
 | Variable | Défaut | Rôle |
 | --- | --- | --- |
 | `IMMO_DATABASE_URL` | `sqlite:///data/app.db` | base SQLite cible |
 | `IMMO_MIN_YIELD_PCT` | `8.0` | seuil de rendement brut |
-| `IMMO_MAX_YIELD_PCT` | `20.0` | plafond de vraisemblance |
+| `IMMO_MAX_YIELD_PCT` | `40.0` | plafond de vraisemblance |
+| `IMMO_MIN_PLAUSIBLE_PRICE` | `5000.0` | prix plancher (erreurs de prix) |
+| `IMMO_MIN_PRICE_PER_M2` | `150.0` | prix plancher au m² (hors parkings) |
 | `IMMO_NOTARY_FEE_RATE` | `0.08` | frais de notaire |
 | `IMMO_MANAGEMENT_FEE_RATE` | `0.07` | frais de gestion locative (part du loyer) |
 | `IMMO_VACANCY_RATE` | `0.04` | provision vacance locative (part du loyer) |
 | `IMMO_MORTGAGE_ANNUAL_RATE` | `0.035` | taux annuel pour l'estimation de cash-flow |
 | `IMMO_REQUEST_DELAY_S` | `1.0` | délai entre deux requêtes |
-| `IMMO_MAX_PAGES` | `5` | pages par source |
+| `IMMO_MAX_PAGES` | `5` | pages par commune |
 | `IMMO_PAGE_SIZE` | `100` | annonces par page (max 100) |
 
 ## Développement
