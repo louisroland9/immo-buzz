@@ -46,19 +46,13 @@ class PipelineResult:
 def collect_raw_listings(
     source: ListingSource, max_pages: int, page_size: int
 ) -> list[RawListing]:
-    """Fetch several pages and drop listings already seen."""
-    seen: set[str] = set()
-    collected: list[RawListing] = []
-    for page in range(max_pages):
-        batch = source.fetch(page=page, page_size=page_size)
-        if not batch:
-            break
-        for raw in batch:
-            if raw.source_id in seen:
-                continue
-            seen.add(raw.source_id)
-            collected.append(raw)
-    return collected
+    """Collect listings across the source search areas, deduplicated.
+
+    ``max_pages`` is the number of pages walked *per search area* (e.g. per
+    commune), not a global budget, so a commune is never hidden by the recent
+    ads of another one.
+    """
+    return source.iter_listings(max_pages=max_pages, page_size=page_size)
 
 
 class Pipeline:
