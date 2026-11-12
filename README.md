@@ -32,14 +32,17 @@ uv run immo-buzz --commune Lille --commune Roubaix
 ```
 prix_total   = prix + 8% de frais de notaire + travaux
                travaux = coût_fixe(état) + coût_m²(état) × surface + prime DPE F/G
-loyer_brut   = loyer_mensuel_estimé * 12
+loyer_brut   = loyer_mensuel * 12  (loyer réel de l'annonce, sinon loyer estimé)
 charges      = copro (€/m²/mois) + taxe_foncière + gestion (7% loyer) + vacance (4% loyer)
 loyer_net    = loyer_brut - charges
 rendement_brut = loyer_brut / prix_total * 100
 rendement_net  = loyer_net  / prix_total * 100
 ```
 
-- Le loyer théorique vient d'une grille de `€/m²/mois` **par commune** (métropole
+- Le **loyer** est récupéré du texte de l'annonce quand il est mentionné (colonne
+  `monthly_rent`, sinon `NULL`) et sert en priorité au calcul du rendement. En
+  complément, une valeur **estimée** (`estimated_monthly_rent`) est toujours
+  calculée à partir d'une grille de `€/m²/mois` **par commune** (métropole
   lilloise), par typologie et par tranche de surface. Source : carte des loyers
   ANIL/DGALN 2023 croisée avec l'OLL de la MEL (constantes éditables dans
   `src/immo_buzz/engine/grids.py`, fallback métropole si la commune est inconnue).

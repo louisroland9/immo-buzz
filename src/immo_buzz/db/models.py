@@ -41,7 +41,11 @@ class ListingBase(SQLModel):
     works_signalled: bool | None = None
 
     detected_condition: str | None = None
+    # ``estimated_monthly_rent`` is always derived from the rent grid, while
+    # ``monthly_rent`` holds the current rent declared in the listing (``None``
+    # when the source does not mention it).
     estimated_monthly_rent: float | None = None
+    monthly_rent: float | None = None
     estimated_works_cost: float | None = None
     total_cost: float | None = None
     estimated_gross_yield: float | None = Field(default=None, index=True)

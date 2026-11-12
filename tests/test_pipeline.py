@@ -196,6 +196,14 @@ def test_build_listing_create_persists_declared_property_tax() -> None:
     assert payload.estimated_property_tax == pytest.approx(60_000 * 0.0080)
 
 
+def test_build_listing_create_persists_declared_monthly_rent() -> None:
+    listing = raw_flat("r", 60_000.0, 25.0).model_copy(update={"monthly_rent": 712.0})
+    payload = build_listing_create(listing, evaluate(listing))
+    assert payload.monthly_rent == 712.0
+    # Lille flat 25 m2 -> tier 0, 18.0 EUR/m2 -> 450 EUR estimate.
+    assert payload.estimated_monthly_rent == pytest.approx(450.0)
+
+
 def test_build_listing_create_persists_text_signals() -> None:
     listing = raw_flat("y", 60_000.0, 25.0).model_copy(
         update={
