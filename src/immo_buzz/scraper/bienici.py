@@ -22,7 +22,9 @@ import httpx
 
 from immo_buzz.config import DEFAULT_PAGE_SIZE, DEFAULT_REQUEST_DELAY_S
 from immo_buzz.db.models import PropertyType
+from immo_buzz.scraper.areas import SearchArea
 from immo_buzz.scraper.base import RawListing
+from immo_buzz.scraper.geocoding import GeoPoint
 
 logger = logging.getLogger(__name__)
 
@@ -94,12 +96,14 @@ class BieniciSource:
         property_types: tuple[PropertyType, ...] = tuple(PropertyType),
         client: httpx.Client | None = None,
         request_delay_s: float = DEFAULT_REQUEST_DELAY_S,
+        area: SearchArea | None = None,
     ) -> None:
         if not zone_ids:
             raise ValueError("at least one zone id is required")
         self._zone_ids = zone_ids
         self._property_types = property_types
         self._delay = request_delay_s
+        self._area = area
         self._client = client or self._build_client()
 
     @staticmethod
@@ -153,7 +157,23 @@ class BieniciSource:
         if self._delay > 0:
             time.sleep(self._delay)
 
-        return [listing for ad in ads if (listing := self._map_ad(ad)) is not None]
+        listings = [listing for ad in ads if (listing := self._map_ad(ad)) is not None]
+        return [listing for listing in listings if self._in_area(listing)]
+
+    def _in_area(self, listing: RawListing) -> bool:
+        """Keep a listing only when it falls inside the search radius.
+
+        A commune zone covers an area wider than the radius, so the distance is
+        checked on the listing coordinates when the source exposes them.
+        Listings without coordinates are kept, as their location is unknown.
+        """
+        if self._area is None:
+            return True
+        if listing.latitude is None or listing.longitude is None:
+            return True
+        return self._area.contains(
+            GeoPoint(latitude=listing.latitude, longitude=listing.longitude)
+        )
 
     def fetch(
         self, *, page: int = 0, page_size: int = DEFAULT_PAGE_SIZE
@@ -233,6 +253,8 @@ class BieniciSource:
         if surface is not None:
             surface = round(surface, 2)
 
+        latitude, longitude = _parse_position(ad.get("blurInfo"))
+
         return RawListing(
             source=self.name,
             source_id=str(ad.get("id")),
@@ -244,6 +266,8 @@ class BieniciSource:
             postal_code=str(postal_code) if postal_code else None,
             district=district_name,
             url=f"{AD_BASE_URL}/{ad.get('id')}",
+            latitude=latitude,
+            longitude=longitude,
             description=ad.get("description") or None,
             rooms=_as_int(ad.get("roomsQuantity")),
             energy_class=_as_energy_class(ad.get("energyClassification")),
@@ -377,6 +401,26 @@ def _parse_amount(raw: str) -> float | None:
         return float(cleaned)
     except ValueError:
         return None
+
+
+def _parse_position(blur_info: Any) -> tuple[float | None, float | None]:
+    """Extract ``(latitude, longitude)`` from the ``blurInfo`` block.
+
+    Bien'ici hides the exact address behind a blurred position, exposed as
+    ``blurInfo.position {lat, lng}``. Returns ``(None, None)`` when absent.
+    """
+    if not isinstance(blur_info, dict):
+        return None, None
+    position = blur_info.get("position")
+    if not isinstance(position, dict):
+        return None, None
+    latitude = _as_float(position.get("lat"))
+    # The field is spelled ``lon`` in the live payload and ``lng`` in some
+    # older recordings: both are accepted.
+    longitude = _as_float(position.get("lng", position.get("lon")))
+    if latitude is None or longitude is None:
+        return None, None
+    return latitude, longitude
 
 
 def _parse_datetime(value: Any) -> datetime | None:

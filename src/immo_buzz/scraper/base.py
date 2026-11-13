@@ -27,6 +27,10 @@ class RawListing(BaseModel):
     district: str | None = None
     url: str
 
+    # WGS84 coordinates of the listing, when exposed by the source.
+    latitude: float | None = None
+    longitude: float | None = None
+
     description: str | None = None
     rooms: int | None = None
     energy_class: str | None = None
