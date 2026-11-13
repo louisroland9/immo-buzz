@@ -301,6 +301,13 @@ def test_parse_property_tax_returns_none_when_absent_or_implausible(
         ("SPECIAL INVESTISSEUR<br>Loyer : 712€ (date du bail 13/06/2013).", 712.0),
         ("Loyer hors charges : 950 €", 950.0),
         ("Loyer charges comprises : 1.050 €", 1050.0),
+        # Periodic rents are normalized to a monthly amount.
+        ("Loyer 900€ par trimestre", 300.0),
+        ("Loyer : 900 € par trimestre", 300.0),
+        ("Loyer trimestriel : 900 €", 300.0),
+        ("Loyer 1 200 € par semestre", 200.0),
+        ("Loyer 6 000 € par an", 500.0),
+        ("Loyer 900 € par mois", 900.0),
     ],
 )
 def test_parse_monthly_rent_reads_the_declared_amount(
