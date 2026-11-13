@@ -31,13 +31,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="pages fetched per search area (default: IMMO_MAX_PAGES or 5)",
     )
     parser.add_argument(
-        "--commune",
-        action="append",
+        "--city",
         default=None,
-        help=(
-            "restrict the search to a commune, repeatable "
-            "(default: all Lille metropolis zones)"
-        ),
+        help="city to search around (default: IMMO_CITY or Lille)",
+    )
+    parser.add_argument(
+        "--radius",
+        type=float,
+        default=None,
+        help="search radius in kilometers (default: IMMO_RADIUS_KM or 10)",
     )
     parser.add_argument(
         "--page-size",
@@ -74,8 +76,12 @@ def main(argv: list[str] | None = None) -> int:
         settings = replace(settings, max_pages=args.max_pages)
     if args.page_size is not None:
         settings = replace(settings, page_size=args.page_size)
+    if args.city is not None:
+        settings = replace(settings, city=args.city)
+    if args.radius is not None:
+        settings = replace(settings, radius_km=args.radius)
 
-    source = build_bienici_source(settings, args.commune)
+    source = build_bienici_source(settings)
     pipeline = Pipeline(source, settings)
     try:
         result = pipeline.run(max_pages=settings.max_pages, dry_run=args.dry_run)
@@ -91,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
 def main_with_settings(settings: Settings, argv: list[str] | None = None) -> int:
     """Run the pipeline with pre-built settings."""
     args = build_parser().parse_args(argv)
-    source = build_bienici_source(settings, args.commune)
+    source = build_bienici_source(settings)
     pipeline = Pipeline(source, settings)
     try:
         result = pipeline.run(max_pages=settings.max_pages, dry_run=args.dry_run)

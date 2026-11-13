@@ -18,13 +18,14 @@ from immo_buzz.db import (
     upsert_listing,
 )
 from immo_buzz.engine import Evaluation, evaluate
+from immo_buzz.scraper.areas import SearchArea, resolve_zone_ids
 from immo_buzz.scraper.base import (
     ListingAvailabilityChecker,
     ListingSource,
     RawListing,
 )
 from immo_buzz.scraper.bienici import BieniciSource
-from immo_buzz.scraper.zones import LILLE_METROPOLE_ZONES, zones_by_name
+from immo_buzz.scraper.geocoding import GeoResolver
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +149,8 @@ def build_listing_create(raw: RawListing, evaluation: Evaluation) -> ListingCrea
         postal_code=raw.postal_code,
         district=raw.district,
         url=raw.url,
+        latitude=raw.latitude,
+        longitude=raw.longitude,
         description=raw.description,
         energy_class=raw.energy_class,
         works_signalled=raw.works_signalled,
@@ -185,13 +188,35 @@ def format_result(result: PipelineResult, min_yield_pct: float) -> str:
 
 
 def build_bienici_source(
-    settings: Settings, commune_names: list[str] | None = None
+    settings: Settings,
+    city: str | None = None,
+    radius_km: float | None = None,
 ) -> BieniciSource:
-    """Create the default Bien'ici source for the Lille metropolitan area."""
-    zones = (
-        zones_by_name(commune_names) if commune_names else list(LILLE_METROPOLE_ZONES)
+    """Create the Bien'ici source for a city and a search radius.
+
+    The city is geocoded through Bien'ici's suggest endpoint, the communes
+    inside the radius are resolved to their Bien'ici zone ids, and the source
+    filters out the listings sitting outside the radius.
+    """
+    city_name = city or settings.city
+    radius = radius_km if radius_km is not None else settings.radius_km
+
+    resolver = GeoResolver(request_delay_s=settings.request_delay_s)
+    try:
+        center = resolver.resolve_city(city_name)
+        area = SearchArea(center=center, radius_km=radius, label=city_name)
+        zone_ids = resolve_zone_ids(area, resolver)
+    finally:
+        resolver.close()
+
+    logger.info(
+        "resolved %s (%s km) to %s Bien'ici zones",
+        city_name,
+        radius,
+        len(zone_ids),
     )
     return BieniciSource(
-        [zone.bienici_zone_id for zone in zones],
+        zone_ids,
         request_delay_s=settings.request_delay_s,
+        area=area,
     )

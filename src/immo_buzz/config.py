@@ -53,6 +53,11 @@ DEFAULT_REQUEST_DELAY_S = 1.0
 DEFAULT_MAX_PAGES = 5
 DEFAULT_PAGE_SIZE = 100
 
+# Default geo search: a city center and a radius in kilometers. The search is
+# no longer limited to the Lille metropolis: any French city can be targeted.
+DEFAULT_CITY = "Lille"
+DEFAULT_RADIUS_KM = 10.0
+
 _ENV_PREFIX = "IMMO_"
 
 
@@ -72,6 +77,8 @@ class Settings:
     request_delay_s: float = DEFAULT_REQUEST_DELAY_S
     max_pages: int = DEFAULT_MAX_PAGES
     page_size: int = DEFAULT_PAGE_SIZE
+    city: str = DEFAULT_CITY
+    radius_km: float = DEFAULT_RADIUS_KM
 
 
 def _env(name: str, default: str) -> str:
@@ -107,6 +114,8 @@ def load_settings() -> Settings:
         "request_delay_s": float(_env("REQUEST_DELAY_S", str(DEFAULT_REQUEST_DELAY_S))),
         "max_pages": int(_env("MAX_PAGES", str(DEFAULT_MAX_PAGES))),
         "page_size": int(_env("PAGE_SIZE", str(DEFAULT_PAGE_SIZE))),
+        "city": _env("CITY", DEFAULT_CITY),
+        "radius_km": float(_env("RADIUS_KM", str(DEFAULT_RADIUS_KM))),
     }
     known = {f.name for f in fields(Settings)}
     return Settings(**{key: value for key, value in values.items() if key in known})
