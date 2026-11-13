@@ -1,14 +1,19 @@
 # immo-buzz
 
-Scrapper de projets immobiliers à haut potentiel sur la métropole lilloise.
+Scrapper de projets immobiliers à haut potentiel, sur toute la France.
 
 ## Workflow
 
 `uv run immo-buzz` (ou `uv run python -m immo_buzz`) récupère les annonces de
-vente de la métropole lilloise via l'API JSON de Bien'ici, calcule un rendement
-locatif brut estimé pour chacune, puis stocke en SQLite celles qui atteignent le
-seuil de rendement. Les annonces dont l'URL n'existe plus sont marquées
-`sold = true` (vendues).
+vente autour d'une **ville et d'un rayon** (10 km autour de Lille par défaut) via
+l'API JSON de Bien'ici, calcule un rendement locatif brut estimé pour chacune,
+puis stocke en SQLite celles qui atteignent le seuil de rendement. Les annonces
+dont l'URL n'existe plus sont marquées `sold = true` (vendues).
+
+La recherche est géographique : la ville est géocodée, les communes comprises
+dans le rayon sont résolues vers leurs zones Bien'ici, et les annonces situées
+hors du rayon sont écartées (les coordonnées de chaque bien sont stockées en
+base).
 
 Pour mettre à niveau une base existante :
 
@@ -20,17 +25,18 @@ uv run alembic upgrade head
 # Analyse complète, sans écriture en base
 uv run immo-buzz --dry-run
 
-# 1 page par commune, seuil abaissé à 7%
-uv run immo-buzz --max-pages 1 --min-yield 7
+# Recherche sur 15 km autour de Lille, seuil abaissé à 7%
+uv run immo-buzz --city Lille --radius 15 --min-yield 7
 
-# Limiter la recherche à deux communes
-uv run immo-buzz --commune Lille --commune Roubaix
+# Une page par commune, recherche autour de Lyon
+uv run immo-buzz --city Lyon --radius 20 --max-pages 1
 ```
 
 La pagination s'applique **commune par commune** : `--max-pages` est le nombre
-de pages parcourues *par zone de recherche*, et non un budget global. Chaque
-commune dispose donc de sa propre fenêtre d'annonces, ce qui évite qu'une
-commune très active (Lille) masque les autres par son flux récent.
+de pages parcourues *par zone de recherche* (une commune = une zone), et non un
+budget global. Chaque commune dispose donc de sa propre fenêtre d'annonces, ce
+qui évite qu'une commune très active (Lille) masque les autres par son flux
+récent.
 
 ## Calcul du rendement
 
@@ -78,7 +84,7 @@ src/immo_buzz/
 ├── config.py           # hypothèses financières et réglages (env IMMO_*)
 ├── cli.py              # interface en ligne de commande
 ├── pipeline.py         # orchestration fetch -> calcul -> filtrage -> stockage
-├── scraper/            # sources d'annonces (Bien'ici, zones de recherche)
+├── scraper/            # sources d'annonces (Bien'ici, géocodage, zone de recherche)
 ├── engine/             # grilles de loyers, détection d'état, calcul de rendement
 └── db/                 # modèles SQLModel, session SQLite (WAL), repository
 ```
@@ -108,6 +114,8 @@ Variables d'environnement (préfixe `IMMO_`) :
 | `IMMO_REQUEST_DELAY_S` | `1.0` | délai entre deux requêtes |
 | `IMMO_MAX_PAGES` | `24` | pages par commune |
 | `IMMO_PAGE_SIZE` | `100` | annonces par page (max 100) |
+| `IMMO_CITY` | `Lille` | ville centre de la recherche |
+| `IMMO_RADIUS_KM` | `10.0` | rayon de recherche (km) |
 
 ## Développement
 
