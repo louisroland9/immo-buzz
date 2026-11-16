@@ -20,3 +20,6 @@ data/*.db-shm
 # IDE
 .vscode/
 .idea/
+
+# Contexte de travail local de l'agent (harnais Cline)
+memory-bank/activeContext.md
