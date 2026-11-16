@@ -36,6 +36,10 @@ class ListingBase(SQLModel):
     district: str | None = None
     url: str
 
+    # WGS84 coordinates of the listing, when the source exposes them.
+    latitude: float | None = None
+    longitude: float | None = None
+
     description: str | None = None
     energy_class: str | None = None
     works_signalled: bool | None = None

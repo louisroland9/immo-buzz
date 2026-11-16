@@ -16,6 +16,10 @@
       "energyClassification": "C",
       "workToDo": false,
       "displayDistrictName": "Lille - Fives",
+      "blurInfo": {
+        "type": "cityOrArrondissement",
+        "position": { "lat": 50.6320, "lng": 3.0600 }
+      },
       "district": {
         "id": 103050,
         "name": "Lille - Fives",

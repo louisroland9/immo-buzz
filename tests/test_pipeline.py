@@ -228,3 +228,12 @@ def test_build_listing_create_persists_text_signals() -> None:
     assert payload.description == "Travaux a prevoir : renovation interieure"
     assert payload.energy_class == "F"
     assert payload.works_signalled is True
+
+
+def test_build_listing_create_persists_coordinates() -> None:
+    listing = raw_flat("geo", 60_000.0, 25.0).model_copy(
+        update={"latitude": 50.632, "longitude": 3.06}
+    )
+    payload = build_listing_create(listing, evaluate(listing))
+    assert payload.latitude == 50.632
+    assert payload.longitude == 3.06

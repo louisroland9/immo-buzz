@@ -9,13 +9,16 @@ import httpx
 import pytest
 
 from immo_buzz.db.models import PropertyType
+from immo_buzz.scraper.areas import SearchArea
 from immo_buzz.scraper.bienici import (
     AD_API_URL,
     API_URL,
     BieniciSource,
     _parse_monthly_rent,
+    _parse_position,
     _parse_property_tax,
 )
+from immo_buzz.scraper.geocoding import GeoPoint
 
 
 class StubResponse:
@@ -323,3 +326,86 @@ def test_parse_monthly_rent_returns_none_when_absent_or_implausible(
     description: str | None,
 ) -> None:
     assert _parse_monthly_rent(description) is None
+
+
+def test_parse_position_reads_the_blurred_coordinates() -> None:
+    latitude, longitude = _parse_position({"position": {"lat": 50.632, "lng": 3.06}})
+
+    assert latitude == pytest.approx(50.632)
+    assert longitude == pytest.approx(3.06)
+
+
+def test_parse_position_accepts_the_lon_spelling() -> None:
+    # The live Bien'ici payload spells the longitude ``lon``.
+    latitude, longitude = _parse_position(
+        {"type": "disk", "position": {"lat": 50.6237, "lon": 3.0543}}
+    )
+
+    assert latitude == pytest.approx(50.6237)
+    assert longitude == pytest.approx(3.0543)
+
+
+@pytest.mark.parametrize(
+    "blur_info",
+    [None, {}, {"position": None}, {"position": {"lat": None, "lng": 3.0}}],
+)
+def test_parse_position_returns_none_when_absent(blur_info: object) -> None:
+    assert _parse_position(blur_info) == (None, None)
+
+
+def test_fetch_maps_the_blurred_coordinates(bienici_payload: dict[str, Any]) -> None:
+    source, _ = make_source(bienici_payload)
+
+    flat = source.fetch(page=0, page_size=100)[0]
+
+    assert flat.latitude == pytest.approx(50.632)
+    assert flat.longitude == pytest.approx(3.06)
+
+
+def test_area_filter_drops_listings_outside_the_radius(
+    bienici_payload: dict[str, Any],
+) -> None:
+    # The fixture flat sits around (50.632, 3.06); a 1 km radius centered on
+    # Lille keeps it, while a radius centered on Paris drops it.
+    client = StubClient(bienici_payload)
+    lille = GeoPoint(latitude=50.6330, longitude=3.0580)
+    paris = GeoPoint(latitude=48.8566, longitude=2.3522)
+
+    near_source = BieniciSource(
+        ["-58404"],
+        client=client,  # type: ignore[arg-type]
+        request_delay_s=0.0,
+        area=SearchArea(center=lille, radius_km=1.0),
+    )
+    far_source = BieniciSource(
+        ["-58404"],
+        client=client,  # type: ignore[arg-type]
+        request_delay_s=0.0,
+        area=SearchArea(center=paris, radius_km=1.0),
+    )
+
+    assert len(near_source.fetch(page=0, page_size=100)) == 3
+    # The flat is dropped (outside the radius); the two listings without
+    # coordinates are kept because their location is unknown.
+    outside = far_source.fetch(page=0, page_size=100)
+    assert {listing.source_id for listing in outside} == {"abc-9001", "xyz-42"}
+
+
+def test_area_filter_keeps_listings_without_coordinates(
+    bienici_payload: dict[str, Any],
+) -> None:
+    # Only the flat carries a blurInfo position: the others have no coordinate
+    # and must be kept, as their location is unknown.
+    client = StubClient(bienici_payload)
+    source = BieniciSource(
+        ["-58404"],
+        client=client,  # type: ignore[arg-type]
+        request_delay_s=0.0,
+        area=SearchArea(
+            center=GeoPoint(latitude=48.8566, longitude=2.3522), radius_km=1.0
+        ),
+    )
+
+    kept = source.fetch(page=0, page_size=100)
+
+    assert {listing.source_id for listing in kept} == {"abc-9001", "xyz-42"}
