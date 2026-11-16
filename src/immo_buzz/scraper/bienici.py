@@ -72,33 +72,38 @@ _PROPERTY_TAX_PATTERN = re.compile(
 _RENT_PATTERN = re.compile(
     rf"loyers?[\s{_SPACES}]+(?:actuel[s]?|mensuel[s]?|net[s]?|hc|cc|hors[\s{_SPACES}]+charges|"
     rf"charges[\s{_SPACES}]+comprises|trimestriel(?:le)?s?|semestriel(?:le)?s?|"
-    rf"annuel(?:le)?s?)?[\s{_SPACES}]*:?[\s{_SPACES}]*"
+    rf"annuel(?:le)?s?|hebdomadaire)?[\s{_SPACES}]*:?[\s{_SPACES}]*"
     rf"([0-9][0-9\s{_SPACES}.,]*)",
     re.IGNORECASE,
 )
 # The declared rent is sometimes expressed per quarter, semester or year
-# ("Loyer 900 EUR par trimestre"). The period follows the amount, so it has to
-# be read from the trailing text and used to bring the value back to a month.
-# Dividers map each detected period to its number of months.
+# ("Loyer 900 EUR par trimestre", "Loyer 300 EUR par semaine"). The period
+# follows the amount, so it has to be read from the trailing text and used to
+# bring the value back to a month. Partial months (weeks) are kept as floats.
 _RENT_PERIOD_PATTERN = re.compile(
-    rf"(?:par[\s{_SPACES}]+|/[\s{_SPACES}]*)(trimestre|semestre|an|ann[ée]e|mois)\b"
-    rf"|trimestriel(?:le)?s?\b|semestriel(?:le)?s?\b|annuel(?:le)?s?\b|mensuel(?:le)?s?\b",
+    rf"(?:par[\s{_SPACES}]+|/[\s{_SPACES}]*)(trimestre|semestre|an|ann[ée]e|mois|semaine)"
+    rf"\b|trimestriel(?:le)?s?\b|semestriel(?:le)?s?\b|annuel(?:le)?s?\b|"
+    rf"mensuel(?:le)?s?\b|hebdomadaire\b",
     re.IGNORECASE,
 )
-_RENT_PERIOD_MONTHS: dict[str, int] = {
-    "trimestre": 3,
-    "trimestriel": 3,
-    "trimestrielle": 3,
-    "semestre": 6,
-    "semestriel": 6,
-    "semestrielle": 6,
-    "an": 12,
-    "annee": 12,
-    "annuel": 12,
-    "annuelle": 12,
-    "mois": 1,
-    "mensuel": 1,
-    "mensuelle": 1,
+# Average number of months covered by each declared period. A month is not a
+# whole number of weeks, hence the fractional value for the weekly case.
+_RENT_PERIOD_MONTHS: dict[str, float] = {
+    "trimestre": 3.0,
+    "trimestriel": 3.0,
+    "trimestrielle": 3.0,
+    "semestre": 6.0,
+    "semestriel": 6.0,
+    "semestrielle": 6.0,
+    "an": 12.0,
+    "annee": 12.0,
+    "annuel": 12.0,
+    "annuelle": 12.0,
+    "mois": 1.0,
+    "mensuel": 1.0,
+    "mensuelle": 1.0,
+    "semaine": 12 / 52,
+    "hebdomadaire": 12 / 52,
 }
 _HTML_TAG = re.compile(r"<[^>]+>")
 
@@ -404,22 +409,23 @@ def _parse_monthly_rent(description: Any) -> float | None:
     return round(monthly, 2)
 
 
-def _detect_rent_period_months(text: str, start: int, end: int) -> int:
+def _detect_rent_period_months(text: str, start: int, end: int) -> float:
     """Return the number of months covered by the rent period around ``end``.
 
     The period can follow the amount ("900 EUR par trimestre") or qualify it
     from the front ("Loyer trimestriel : 900 EUR"). Only the few characters
     surrounding the match are inspected so a period belonging to another
-    sentence is not captured. When no period is mentioned the rent is assumed
-    to be monthly, which is the usual phrasing.
+    sentence is not captured. A weekly period yields a fractional amount of
+    months. When no period is mentioned the rent is assumed to be monthly,
+    which is the usual phrasing.
     """
     window = text[max(start - 20, 0) : end + 40]
     period = _RENT_PERIOD_PATTERN.search(window)
     if period is None:
-        return 1
+        return 1.0
     label = (period.group(1) or period.group(0)).lower()
     label = label.removeprefix("par ").strip()
-    return _RENT_PERIOD_MONTHS.get(label, 1)
+    return _RENT_PERIOD_MONTHS.get(label, 1.0)
 
 
 def _parse_amount(raw: str) -> float | None:

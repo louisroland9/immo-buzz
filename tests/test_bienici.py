@@ -311,6 +311,10 @@ def test_parse_property_tax_returns_none_when_absent_or_implausible(
         ("Loyer 1 200 € par semestre", 200.0),
         ("Loyer 6 000 € par an", 500.0),
         ("Loyer 900 € par mois", 900.0),
+        # A weekly rent covers 12/52 of a month, not a whole one.
+        ("Loyer 300 € par semaine", 300 / (12 / 52)),
+        ("Loyer 300 EUR/semaine", 300 / (12 / 52)),
+        ("Loyer hebdomadaire : 300 €", 300 / (12 / 52)),
     ],
 )
 def test_parse_monthly_rent_reads_the_declared_amount(
